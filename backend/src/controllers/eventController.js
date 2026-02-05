@@ -328,24 +328,62 @@ exports.deleteEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const { delete_type, deleteType, occurrence_date, occurrenceDate } = req.body;
-    
-    const actualDeleteType = deleteType || delete_type;
+
+    const actualDeleteType = deleteType || delete_type || 'single';
     const actualOccurrenceDate = occurrenceDate || occurrence_date;
-    
+
     const userId = req.user.id;
 
-    // 원본 이벤트 조회
+    // 반복 일정인 경우 (ID가 series-로 시작)
+    if (id.startsWith('series-')) {
+      const parts = id.split('-');
+      const seriesId = parts[1];
+      const occurrenceTimestamp = parts[2];
+
+      // event_series 조회
+      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1 AND creator_id = $2';
+      const seriesResult = await query(seriesQuery, [seriesId, userId]);
+
+      if (seriesResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Event series not found' });
+      }
+
+      const occurrenceDate = new Date(parseInt(occurrenceTimestamp));
+      const occurrenceDateStr = occurrenceDate.toISOString().split('T')[0];
+
+      if (actualDeleteType === 'single') {
+        // 이 날짜만 삭제 - 예외 추가
+        const exceptionQuery = `
+          INSERT INTO event_exceptions (series_id, exception_date)
+          VALUES ($1, $2)
+          ON CONFLICT (series_id, exception_date) DO NOTHING
+        `;
+        await query(exceptionQuery, [seriesId, occurrenceDateStr]);
+
+        return res.json({ success: true, message: 'Event occurrence deleted' });
+      } else if (actualDeleteType === 'series') {
+        // 전체 반복 일정 삭제
+        await transaction(async (client) => {
+          const deleteSeriesQuery = 'DELETE FROM event_series WHERE id = $1 AND creator_id = $2';
+          await client.query(deleteSeriesQuery, [seriesId, userId]);
+        });
+
+        return res.json({ success: true, message: 'All recurring events deleted' });
+      }
+    }
+
+    // 일반 일정인 경우
     const originalQuery = 'SELECT * FROM events WHERE id = $1 AND creator_id = $2';
     const originalResult = await query(originalQuery, [id, userId]);
-    
+
     if (originalResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
     const originalEvent = originalResult.rows[0];
 
-    // 반복 일정 삭제
-    if (originalEvent.series_id && actualDeleteType === 'this') {
+    // 반복 일정의 예외 이벤트 삭제
+    if (originalEvent.series_id && actualDeleteType === 'single') {
       // 이 날짜만 삭제 - 예외 추가
       const exceptionQuery = `
         INSERT INTO event_exceptions (series_id, exception_date)
@@ -353,21 +391,21 @@ exports.deleteEvent = async (req, res) => {
         ON CONFLICT (series_id, exception_date) DO NOTHING
       `;
       await query(exceptionQuery, [originalEvent.series_id, actualOccurrenceDate]);
-      
+
       return res.json({ success: true, message: 'Event occurrence deleted' });
-    } else if (originalEvent.series_id && actualDeleteType === 'all') {
+    } else if (originalEvent.series_id && actualDeleteType === 'series') {
       // 전체 반복 일정 삭제
       await transaction(async (client) => {
         const deleteSeriesQuery = 'DELETE FROM event_series WHERE id = $1 AND creator_id = $2';
         await client.query(deleteSeriesQuery, [originalEvent.series_id, userId]);
       });
-      
+
       return res.json({ success: true, message: 'All recurring events deleted' });
     } else {
       // 일반 일정 삭제
       const deleteQuery = 'DELETE FROM events WHERE id = $1 AND creator_id = $2';
       await query(deleteQuery, [id, userId]);
-      
+
       return res.json({ success: true, message: 'Event deleted' });
     }
   } catch (error) {
