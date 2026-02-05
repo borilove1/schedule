@@ -236,23 +236,119 @@ exports.createEvent = async (req, res) => {
 exports.updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      title, content, 
+    const {
+      title, content,
       start_at, end_at, startAt, endAt,
       status, edit_type, editType, occurrence_date, occurrenceDate
     } = req.body;
-    
+
     const actualStartAt = startAt || start_at;
     const actualEndAt = endAt || end_at;
     const actualEditType = editType || edit_type;
     const actualOccurrenceDate = occurrenceDate || occurrence_date;
-    
+
     const userId = req.user.id;
 
-    // 원본 이벤트 조회
+    // 반복 일정인 경우 (ID가 series-로 시작)
+    if (id.startsWith('series-')) {
+      const parts = id.split('-');
+      const seriesId = parts[1];
+
+      // event_series 조회
+      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1 AND creator_id = $2';
+      const seriesResult = await query(seriesQuery, [seriesId, userId]);
+
+      if (seriesResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Event series not found' });
+      }
+
+      const series = seriesResult.rows[0];
+
+      if (actualEditType === 'this') {
+        // 이 날짜만 수정 - 예외 이벤트 생성
+        const occurrenceTimestamp = parts[2];
+        const occurrenceDate = new Date(parseInt(occurrenceTimestamp));
+        const occurrenceDateStr = occurrenceDate.toISOString().split('T')[0];
+
+        const result = await transaction(async (client) => {
+          const insertQuery = `
+            INSERT INTO events (
+              title, content, start_at, end_at, status, alert,
+              is_exception, series_id, occurrence_date,
+              creator_id, department_id, office_id, division_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, $12)
+            RETURNING *
+          `;
+
+          const values = [
+            title, content, actualStartAt, actualEndAt, status || 'PENDING', series.alert,
+            seriesId, occurrenceDateStr, userId,
+            series.department_id, series.office_id, series.division_id
+          ];
+
+          const insertResult = await client.query(insertQuery, values);
+
+          // 원래 반복 일정에서 이 날짜 제외
+          const exceptionQuery = `
+            INSERT INTO event_exceptions (series_id, exception_date)
+            VALUES ($1, $2)
+            ON CONFLICT (series_id, exception_date) DO NOTHING
+          `;
+          await client.query(exceptionQuery, [seriesId, occurrenceDateStr]);
+
+          return insertResult;
+        });
+
+        const updatedEvent = result.rows[0];
+
+        // 알림 생성
+        try {
+          await createNotification(
+            userId,
+            'EVENT_UPDATED',
+            '일정 수정',
+            `"${updatedEvent.title}" 일정이 수정되었습니다.`,
+            updatedEvent.id
+          );
+        } catch (notifError) {
+          console.error('Failed to create notification:', notifError);
+        }
+
+        return res.json({ success: true, data: { event: updatedEvent } });
+      } else if (actualEditType === 'all') {
+        // 전체 반복 일정 수정
+        const updateQuery = `
+          UPDATE event_series
+          SET title = $1, content = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $3 AND creator_id = $4
+          RETURNING *
+        `;
+        const result = await query(updateQuery, [title, content, seriesId, userId]);
+
+        const updatedSeries = result.rows[0];
+
+        // 알림 생성
+        try {
+          await createNotification(
+            userId,
+            'EVENT_UPDATED',
+            '반복 일정 수정',
+            `"${updatedSeries.title}" 반복 일정이 수정되었습니다.`,
+            null
+          );
+        } catch (notifError) {
+          console.error('Failed to create notification:', notifError);
+        }
+
+        return res.json({ success: true, data: { series: updatedSeries } });
+      }
+    }
+
+    // 일반 일정인 경우 - 원본 이벤트 조회
     const originalQuery = 'SELECT * FROM events WHERE id = $1 AND creator_id = $2';
     const originalResult = await query(originalQuery, [id, userId]);
-    
+
     if (originalResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
