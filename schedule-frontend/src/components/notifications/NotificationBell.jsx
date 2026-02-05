@@ -1,29 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Bell } from 'lucide-react';
 import NotificationModal from './NotificationModal';
-import api from '../../utils/api';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export default function NotificationBell({ darkMode, textColor }) {
   const [showModal, setShowModal] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Load unread count on mount and periodically
-  const loadUnreadCount = async () => {
-    try {
-      const { count } = await api.getUnreadNotificationCount();
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error('Failed to load unread count:', error);
-    }
-  };
-
-  useEffect(() => {
-    loadUnreadCount();
-
-    // Poll for unread count every 60 seconds
-    const interval = setInterval(loadUnreadCount, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  const { unreadCount, loadUnreadCount } = useNotification();
 
   // Refresh unread count when modal closes
   const handleModalClose = () => {

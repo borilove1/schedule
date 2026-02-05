@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import MainLayout from './components/layout/MainLayout';
@@ -51,9 +52,11 @@ function AppContent() {
 
   // 인증된 경우
   return (
-    <MainLayout>
-      <Calendar />
-    </MainLayout>
+    <NotificationProvider>
+      <MainLayout>
+        <Calendar />
+      </MainLayout>
+    </NotificationProvider>
   );
 }
 

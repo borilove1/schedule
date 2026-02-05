@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Edit2, Trash2, Check, Calendar, Clock, User } from 'lucide-react';
 import api from '../../utils/api';
+import { useNotification } from '../../contexts/NotificationContext';
 
 export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }) {
+  const { refreshNotifications } = useNotification();
   const [event, setEvent] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -111,6 +113,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
       setIsEditing(false);
       onSuccess();
       await loadEvent();
+
+      // 알림 카운트 즉시 새로고침
+      refreshNotifications();
     } catch (err) {
       setError(err.message || '일정 수정에 실패했습니다.');
     } finally {
@@ -147,6 +152,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
       await api.deleteEvent(eventId, { deleteType });
       onSuccess();
       onClose();
+
+      // 알림 카운트 즉시 새로고침
+      refreshNotifications();
     } catch (err) {
       console.error('Delete error:', err);
       setError(err.message || '일정 삭제에 실패했습니다.');
@@ -175,6 +183,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
       // 상태 업데이트 후 일정 다시 로드
       await loadEvent();
       onSuccess();
+
+      // 알림 카운트 즉시 새로고침
+      refreshNotifications();
 
     } catch (err) {
       setError(err.message || '상태 변경에 실패했습니다.');
