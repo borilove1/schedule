@@ -191,3 +191,25 @@ exports.createNotification = async (userId, type, title, message, relatedEventId
     throw error;
   }
 };
+
+/**
+ * Check upcoming events and create reminders
+ * POST /api/v1/notifications/check-reminders
+ */
+exports.checkReminders = async (req, res) => {
+  try {
+    const { hoursAhead = 24 } = req.body;
+    const { checkAllUpcomingEvents } = require('../utils/reminderService');
+
+    const result = await checkAllUpcomingEvents(hoursAhead);
+
+    res.json({
+      success: true,
+      message: 'Reminders checked',
+      data: result
+    });
+  } catch (error) {
+    console.error('Check reminders error:', error);
+    res.status(500).json({ success: false, message: 'Failed to check reminders' });
+  }
+};

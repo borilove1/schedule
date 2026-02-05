@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const cron = require('node-cron');
 // const rateLimit = require('express-rate-limit'); // 임시 비활성화
 
 // 라우터 임포트
@@ -17,6 +18,9 @@ const notificationRoutes = require('./routes/notifications');
 
 // 미들웨어 임포트
 const errorHandler = require('./middleware/errorHandler');
+
+// 서비스 임포트
+const { checkAllUpcomingEvents } = require('./src/utils/reminderService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -112,6 +116,34 @@ app.listen(PORT, () => {
 ║   URL: http://localhost:${PORT.toString().padEnd(22)}║
 ╚═══════════════════════════════════════════╝
   `);
+
+  // ========== Cron Jobs 시작 ==========
+
+  // 일정 리마인더 체크 - 매시간 정각에 실행
+  cron.schedule('0 * * * *', async () => {
+    console.log('[Cron] Checking upcoming events for reminders...');
+    try {
+      const result = await checkAllUpcomingEvents(24); // 24시간 이내 일정 체크
+      console.log(`[Cron] Reminder check completed: ${result.totalCount} notifications created`);
+    } catch (error) {
+      console.error('[Cron] Failed to check reminders:', error);
+    }
+  });
+
+  // 추가: 매일 오전 9시에도 체크 (중요한 알림을 놓치지 않도록)
+  cron.schedule('0 9 * * *', async () => {
+    console.log('[Cron] Daily reminder check at 9 AM...');
+    try {
+      const result = await checkAllUpcomingEvents(24);
+      console.log(`[Cron] Daily reminder check completed: ${result.totalCount} notifications created`);
+    } catch (error) {
+      console.error('[Cron] Failed to check daily reminders:', error);
+    }
+  });
+
+  console.log('✅ Cron jobs started:');
+  console.log('   - Hourly reminder check: 0 * * * * (every hour)');
+  console.log('   - Daily reminder check: 0 9 * * * (9 AM daily)');
 });
 
 // Graceful Shutdown

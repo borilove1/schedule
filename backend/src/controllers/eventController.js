@@ -3,6 +3,7 @@
 
 const { query, transaction } = require('../../config/database');
 const { generateOccurrencesFromSeries } = require('../utils/recurringEvents');
+const { createNotification } = require('./notificationController');
 
 /**
  * 일정 목록 조회 (반복 일정 자동 확장)
@@ -291,7 +292,22 @@ exports.updateEvent = async (req, res) => {
         return insertResult;
       });
 
-      return res.json({ success: true, data: { event: result.rows[0] } });
+      const updatedEvent = result.rows[0];
+
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_UPDATED',
+          '일정 수정',
+          `"${updatedEvent.title}" 일정이 수정되었습니다.`,
+          updatedEvent.id
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
+      return res.json({ success: true, data: { event: updatedEvent } });
     } else if (originalEvent.series_id && actualEditType === 'all') {
       // 전체 반복 일정 수정
       const updateQuery = `
@@ -301,8 +317,23 @@ exports.updateEvent = async (req, res) => {
         RETURNING *
       `;
       const result = await query(updateQuery, [title, content, originalEvent.series_id, userId]);
-      
-      return res.json({ success: true, data: { series: result.rows[0] } });
+
+      const updatedSeries = result.rows[0];
+
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_UPDATED',
+          '반복 일정 수정',
+          `"${updatedSeries.title}" 반복 일정이 수정되었습니다.`,
+          null
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
+      return res.json({ success: true, data: { series: updatedSeries } });
     } else {
       // 일반 일정 수정
       const updateQuery = `
@@ -312,8 +343,23 @@ exports.updateEvent = async (req, res) => {
         RETURNING *
       `;
       const result = await query(updateQuery, [title, content, actualStartAt, actualEndAt, status, id, userId]);
-      
-      return res.json({ success: true, data: { event: result.rows[0] } });
+
+      const updatedEvent = result.rows[0];
+
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_UPDATED',
+          '일정 수정',
+          `"${updatedEvent.title}" 일정이 수정되었습니다.`,
+          updatedEvent.id
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
+      return res.json({ success: true, data: { event: updatedEvent } });
     }
   } catch (error) {
     console.error('Update event error:', error);
@@ -351,6 +397,8 @@ exports.deleteEvent = async (req, res) => {
       const occurrenceDate = new Date(parseInt(occurrenceTimestamp));
       const occurrenceDateStr = occurrenceDate.toISOString().split('T')[0];
 
+      const series = seriesResult.rows[0];
+
       if (actualDeleteType === 'single') {
         // 이 날짜만 삭제 - 예외 추가
         const exceptionQuery = `
@@ -360,6 +408,19 @@ exports.deleteEvent = async (req, res) => {
         `;
         await query(exceptionQuery, [seriesId, occurrenceDateStr]);
 
+        // 알림 생성
+        try {
+          await createNotification(
+            userId,
+            'EVENT_DELETED',
+            '일정 삭제',
+            `"${series.title}" 일정 (${occurrenceDateStr})이 삭제되었습니다.`,
+            null
+          );
+        } catch (notifError) {
+          console.error('Failed to create notification:', notifError);
+        }
+
         return res.json({ success: true, message: 'Event occurrence deleted' });
       } else if (actualDeleteType === 'series') {
         // 전체 반복 일정 삭제
@@ -367,6 +428,19 @@ exports.deleteEvent = async (req, res) => {
           const deleteSeriesQuery = 'DELETE FROM event_series WHERE id = $1 AND creator_id = $2';
           await client.query(deleteSeriesQuery, [seriesId, userId]);
         });
+
+        // 알림 생성
+        try {
+          await createNotification(
+            userId,
+            'EVENT_DELETED',
+            '반복 일정 삭제',
+            `"${series.title}" 반복 일정이 모두 삭제되었습니다.`,
+            null
+          );
+        } catch (notifError) {
+          console.error('Failed to create notification:', notifError);
+        }
 
         return res.json({ success: true, message: 'All recurring events deleted' });
       }
@@ -392,6 +466,19 @@ exports.deleteEvent = async (req, res) => {
       `;
       await query(exceptionQuery, [originalEvent.series_id, actualOccurrenceDate]);
 
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_DELETED',
+          '일정 삭제',
+          `"${originalEvent.title}" 일정이 삭제되었습니다.`,
+          null
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
       return res.json({ success: true, message: 'Event occurrence deleted' });
     } else if (originalEvent.series_id && actualDeleteType === 'series') {
       // 전체 반복 일정 삭제
@@ -400,11 +487,39 @@ exports.deleteEvent = async (req, res) => {
         await client.query(deleteSeriesQuery, [originalEvent.series_id, userId]);
       });
 
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_DELETED',
+          '반복 일정 삭제',
+          `"${originalEvent.title}" 반복 일정이 모두 삭제되었습니다.`,
+          null
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
       return res.json({ success: true, message: 'All recurring events deleted' });
     } else {
       // 일반 일정 삭제
+      const eventTitle = originalEvent.title;
+
       const deleteQuery = 'DELETE FROM events WHERE id = $1 AND creator_id = $2';
       await query(deleteQuery, [id, userId]);
+
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_DELETED',
+          '일정 삭제',
+          `"${eventTitle}" 일정이 삭제되었습니다.`,
+          null
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
 
       return res.json({ success: true, message: 'Event deleted' });
     }
@@ -642,8 +757,22 @@ exports.completeEvent = async (req, res) => {
         return insertResult;
       });
 
-      return res.json({ 
-        success: true, 
+      // 알림 생성
+      try {
+        await createNotification(
+          userId,
+          'EVENT_COMPLETED',
+          '일정 완료',
+          `"${series.title}" 일정을 완료했습니다.`,
+          null,
+          { occurrenceDate: occurrenceDateStr }
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
+      return res.json({
+        success: true,
         message: 'Event completed',
         data: { event: result.rows[0] }
       });
@@ -662,10 +791,25 @@ exports.completeEvent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    res.json({ 
-      success: true, 
+    const completedEvent = result.rows[0];
+
+    // 알림 생성
+    try {
+      await createNotification(
+        userId,
+        'EVENT_COMPLETED',
+        '일정 완료',
+        `"${completedEvent.title}" 일정을 완료했습니다.`,
+        completedEvent.id
+      );
+    } catch (notifError) {
+      console.error('Failed to create notification:', notifError);
+    }
+
+    res.json({
+      success: true,
       message: 'Event completed',
-      data: { event: result.rows[0] }
+      data: { event: completedEvent }
     });
   } catch (error) {
     console.error('Complete event error:', error);
