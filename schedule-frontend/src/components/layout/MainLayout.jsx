@@ -111,7 +111,7 @@ export default function MainLayout({ children }) {
       )}
 
       {/* Main Content */}
-      <main style={{ padding: isMobile ? '16px' : '24px', maxWidth: '1400px', margin: '0 auto' }}>
+      <main style={{ padding: isMobile ? '16px' : '24px', maxWidth: '1024px', margin: '0 auto' }}>
         {children}
       </main>
     </div>

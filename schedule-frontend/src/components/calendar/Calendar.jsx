@@ -146,15 +146,8 @@ export default function Calendar() {
       color: textColor,
       fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", sans-serif'
     }}>
-      {/* Calendar Content Wrapper - scaled to 85% */}
+      {/* Calendar Navigation */}
       <div style={{
-        transform: 'scale(0.85)',
-        transformOrigin: 'top center',
-        width: '117.65%', // 100% / 0.85 to compensate for scaling
-        marginLeft: '-8.825%' // (117.65% - 100%) / 2 to center
-      }}>
-        {/* Calendar Navigation */}
-        <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -511,7 +504,6 @@ export default function Calendar() {
             ))}
           </div>
         )}
-      </div>
       </div>
 
       {/* Modals */}
