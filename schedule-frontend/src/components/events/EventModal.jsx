@@ -23,20 +23,28 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
   const textColor = darkMode ? '#e2e8f0' : '#1e293b';
   const borderColor = darkMode ? '#334155' : '#e2e8f0';
 
+  // 폼 리셋 함수
+  const resetForm = () => {
+    const dateStr = selectedDate || new Date().toISOString().split('T')[0];
+    console.log('[EventModal] Resetting form to initial state');
+    setFormData({
+      title: '',
+      content: '',
+      startDate: dateStr,
+      startTime: '09:00',
+      endDate: dateStr,
+      endTime: '18:00',
+      priority: 'NORMAL'
+    });
+    setError('');
+    setLoading(false);
+  };
+
   // 모달이 열릴 때마다 폼 초기화
   useEffect(() => {
     if (isOpen) {
-      const dateStr = selectedDate || new Date().toISOString().split('T')[0];
-      setFormData({
-        title: '',
-        content: '',
-        startDate: dateStr,
-        startTime: '09:00',
-        endDate: dateStr,
-        endTime: '18:00',
-        priority: 'NORMAL'
-      });
-      setError('');
+      console.log('[EventModal] Modal opened, resetting form');
+      resetForm();
     }
   }, [isOpen, selectedDate]);
 
@@ -59,6 +67,8 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
       const startAt = `${formData.startDate}T${formData.startTime}:00`;
       const endAt = `${formData.endDate}T${formData.endTime}:00`;
 
+      console.log('[EventModal] Creating event:', { title: formData.title, startAt, endAt });
+
       await api.createEvent({
         title: formData.title,
         content: formData.content,
@@ -67,9 +77,12 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
         priority: formData.priority
       });
 
+      console.log('[EventModal] Event created successfully, resetting form');
+      resetForm(); // 폼 리셋
       onSuccess();
       onClose();
     } catch (err) {
+      console.error('[EventModal] Error creating event:', err);
       setError(err.message || '일정 생성에 실패했습니다.');
     } finally {
       setLoading(false);
