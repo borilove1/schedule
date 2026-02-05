@@ -1,4 +1,4 @@
-const { query } = require('../../config/db');
+const { query } = require('../../config/database');
 
 /**
  * Convert snake_case to camelCase for frontend
