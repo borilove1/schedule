@@ -1,0 +1,459 @@
+-- ========================================
+-- 업무일정 관리 시스템 - PostgreSQL 스키마
+-- ========================================
+
+-- 확장 기능 활성화
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ========================================
+-- ENUM 타입 정의
+-- ========================================
+
+-- 사용자 권한
+CREATE TYPE user_role AS ENUM ('USER', 'DEPT_LEAD', 'ADMIN');
+
+-- 부서장 조회 범위
+CREATE TYPE admin_scope AS ENUM ('DEPARTMENT', 'OFFICE', 'DIVISION');
+
+-- 일정 상태
+CREATE TYPE event_status AS ENUM ('PENDING', 'DONE');
+
+-- 반복 일정 타입
+CREATE TYPE recurrence_type AS ENUM ('day', 'week', 'month', 'year');
+
+-- 알림 시간
+CREATE TYPE alert_time AS ENUM ('none', '30min', '1hour', '3hour', '1day');
+
+-- ========================================
+-- 1. 조직 구조 테이블
+-- ========================================
+
+-- 본부
+CREATE TABLE divisions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 처/실
+CREATE TABLE offices (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    division_id INTEGER NOT NULL REFERENCES divisions(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, division_id)
+);
+
+-- 부서
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    office_id INTEGER NOT NULL REFERENCES offices(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, office_id)
+);
+
+-- 조직 구조 인덱스
+CREATE INDEX idx_offices_division ON offices(division_id);
+CREATE INDEX idx_departments_office ON departments(office_id);
+
+-- ========================================
+-- 2. 사용자 테이블
+-- ========================================
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    position VARCHAR(50) NOT NULL, -- 사원, 대리, 과장, 차장, 부장, 실장, 처장, 본부장, 관리자
+    
+    -- 조직 정보
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    office_id INTEGER REFERENCES offices(id) ON DELETE SET NULL,
+    division_id INTEGER REFERENCES divisions(id) ON DELETE SET NULL,
+    
+    -- 권한 정보
+    role user_role NOT NULL DEFAULT 'USER',
+    scope admin_scope, -- 부서장/관리자의 조회 범위
+    
+    -- 메타 정보
+    is_active BOOLEAN DEFAULT true,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 제약 조건
+    CONSTRAINT check_admin_scope CHECK (
+        (role IN ('DEPT_LEAD', 'ADMIN') AND scope IS NOT NULL) OR
+        (role = 'USER' AND scope IS NULL)
+    )
+);
+
+-- 사용자 인덱스
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_department ON users(department_id);
+CREATE INDEX idx_users_office ON users(office_id);
+CREATE INDEX idx_users_division ON users(division_id);
+CREATE INDEX idx_users_role ON users(role);
+
+-- ========================================
+-- 3. 일정 테이블
+-- ========================================
+
+-- 반복 일정 시리즈 (반복 일정의 기본 정보)
+CREATE TABLE event_series (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    
+    -- 반복 설정
+    recurrence_type recurrence_type NOT NULL,
+    recurrence_interval INTEGER NOT NULL DEFAULT 1, -- 간격 (예: 2주마다 = 2)
+    recurrence_end_date DATE, -- 반복 종료일 (NULL이면 무한 반복)
+    
+    -- 시간 설정 (기준 시간)
+    start_time TIME NOT NULL, -- 시작 시간
+    end_time TIME NOT NULL, -- 종료 시간
+    first_occurrence_date DATE NOT NULL, -- 첫 발생일
+    
+    -- 알림
+    alert alert_time DEFAULT 'none',
+    
+    -- 작성자 및 조직 정보
+    creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    office_id INTEGER REFERENCES offices(id) ON DELETE SET NULL,
+    division_id INTEGER REFERENCES divisions(id) ON DELETE SET NULL,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 일정 (단일 일정 + 반복 일정의 개별 발생)
+CREATE TABLE events (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    
+    -- 시간 정보
+    start_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    
+    -- 상태
+    status event_status NOT NULL DEFAULT 'PENDING',
+    completed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- 알림
+    alert alert_time DEFAULT 'none',
+    
+    -- 반복 일정 관련
+    series_id INTEGER REFERENCES event_series(id) ON DELETE CASCADE, -- NULL이면 단일 일정
+    occurrence_date DATE, -- 반복 일정의 발생일 (반복 일정인 경우)
+    is_exception BOOLEAN DEFAULT false, -- 반복 일정의 예외 (수정된 개별 발생)
+    original_series_id INTEGER REFERENCES event_series(id) ON DELETE CASCADE, -- 예외인 경우 원본 시리즈
+    
+    -- 작성자 및 조직 정보
+    creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    office_id INTEGER REFERENCES offices(id) ON DELETE SET NULL,
+    division_id INTEGER REFERENCES divisions(id) ON DELETE SET NULL,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 제약 조건
+    CONSTRAINT check_time_range CHECK (end_at > start_at),
+    CONSTRAINT check_series_occurrence CHECK (
+        (series_id IS NOT NULL AND occurrence_date IS NOT NULL) OR
+        (series_id IS NULL AND occurrence_date IS NULL)
+    )
+);
+
+-- 반복 일정 예외 (건너뛴 발생)
+CREATE TABLE event_exceptions (
+    id SERIAL PRIMARY KEY,
+    series_id INTEGER NOT NULL REFERENCES event_series(id) ON DELETE CASCADE,
+    exception_date DATE NOT NULL, -- 건너뛸 날짜
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(series_id, exception_date)
+);
+
+-- 일정 인덱스
+CREATE INDEX idx_events_start_at ON events(start_at);
+CREATE INDEX idx_events_end_at ON events(end_at);
+CREATE INDEX idx_events_status ON events(status);
+CREATE INDEX idx_events_creator ON events(creator_id);
+CREATE INDEX idx_events_department ON events(department_id);
+CREATE INDEX idx_events_office ON events(office_id);
+CREATE INDEX idx_events_division ON events(division_id);
+CREATE INDEX idx_events_series ON events(series_id);
+CREATE INDEX idx_event_series_creator ON event_series(creator_id);
+CREATE INDEX idx_event_exceptions_series ON event_exceptions(series_id);
+
+-- ========================================
+-- 4. 댓글 테이블
+-- ========================================
+
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    
+    -- 관계
+    event_id INTEGER REFERENCES events(id) ON DELETE CASCADE, -- 단일 일정 댓글
+    series_id INTEGER REFERENCES event_series(id) ON DELETE CASCADE, -- 반복 일정 시리즈 댓글
+    author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- 수정 여부
+    is_edited BOOLEAN DEFAULT false,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 제약 조건: 단일 일정 또는 시리즈 중 하나에만 댓글
+    CONSTRAINT check_comment_target CHECK (
+        (event_id IS NOT NULL AND series_id IS NULL) OR
+        (event_id IS NULL AND series_id IS NOT NULL)
+    )
+);
+
+-- 댓글 인덱스
+CREATE INDEX idx_comments_event ON comments(event_id);
+CREATE INDEX idx_comments_series ON comments(series_id);
+CREATE INDEX idx_comments_author ON comments(author_id);
+CREATE INDEX idx_comments_created ON comments(created_at);
+
+-- ========================================
+-- 5. 시스템 설정 테이블
+-- ========================================
+
+CREATE TABLE system_settings (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(100) NOT NULL UNIQUE,
+    value JSONB NOT NULL,
+    description TEXT,
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 기본 설정 데이터 삽입
+INSERT INTO system_settings (key, value, description) VALUES
+    ('due_soon_threshold', '3', '마감임박 기준 시간 (시간 단위)'),
+    ('max_events_per_month', '100', '월 최대 일정 수'),
+    ('allow_past_events', 'false', '과거 일정 생성 허용'),
+    ('default_alert', '"1hour"', '기본 알림 시간'),
+    ('password_min_length', '4', '비밀번호 최소 길이'),
+    ('session_timeout', '60', '세션 타임아웃 (분)');
+
+-- ========================================
+-- 6. 세션 테이블 (JWT 대신 사용 가능)
+-- ========================================
+
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(512) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 만료된 세션 자동 삭제를 위한 인덱스
+    CONSTRAINT check_expires_future CHECK (expires_at > created_at)
+);
+
+CREATE INDEX idx_sessions_user ON sessions(user_id);
+CREATE INDEX idx_sessions_token ON sessions(token);
+CREATE INDEX idx_sessions_expires ON sessions(expires_at);
+
+-- ========================================
+-- 7. 업데이트 트리거 함수
+-- ========================================
+
+-- updated_at 자동 업데이트 함수
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 각 테이블에 트리거 적용
+CREATE TRIGGER update_divisions_updated_at BEFORE UPDATE ON divisions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_offices_updated_at BEFORE UPDATE ON offices
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_departments_updated_at BEFORE UPDATE ON departments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_event_series_updated_at BEFORE UPDATE ON event_series
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON comments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ========================================
+-- 8. 샘플 데이터 (개발/테스트용)
+-- ========================================
+
+-- 본부
+INSERT INTO divisions (name) VALUES ('기술본부'), ('경영본부');
+
+-- 처/실
+INSERT INTO offices (name, division_id) VALUES 
+    ('IT처', 1),
+    ('기획관리실', 1),
+    ('재무처', 2),
+    ('인사처', 2);
+
+-- 부서
+INSERT INTO departments (name, office_id) VALUES 
+    ('개발1부서', 1),
+    ('개발2부서', 1),
+    ('인프라부서', 1),
+    ('기획부서', 2),
+    ('전략부서', 2),
+    ('재무부서', 3),
+    ('회계부서', 3),
+    ('인사부서', 4),
+    ('채용부서', 4);
+
+-- 사용자 (비밀번호는 bcrypt로 해시해야 함, 여기서는 임시로 평문)
+-- 실제 운영 시에는 bcrypt.hash() 사용
+INSERT INTO users (email, password_hash, name, position, department_id, office_id, division_id, role, scope) VALUES 
+    ('admin@company.com', '$2b$10$placeholder', '시스템관리자', '관리자', NULL, NULL, NULL, 'ADMIN', NULL),
+    ('park@company.com', '$2b$10$placeholder', '박사원', '사원', 1, 1, 1, 'USER', NULL),
+    ('kim@company.com', '$2b$10$placeholder', '김부장', '부장', 1, 1, 1, 'DEPT_LEAD', 'DEPARTMENT'),
+    ('yoon@company.com', '$2b$10$placeholder', '윤본부장', '본부장', NULL, NULL, 1, 'DEPT_LEAD', 'DIVISION');
+
+-- ========================================
+-- 9. 유용한 뷰 (View)
+-- ========================================
+
+-- 사용자 전체 정보 뷰 (조직 정보 포함)
+CREATE VIEW v_users_with_org AS
+SELECT 
+    u.id,
+    u.email,
+    u.name,
+    u.position,
+    u.role,
+    u.scope,
+    d.name AS department_name,
+    o.name AS office_name,
+    div.name AS division_name,
+    u.is_active,
+    u.last_login_at,
+    u.created_at
+FROM users u
+LEFT JOIN departments d ON u.department_id = d.id
+LEFT JOIN offices o ON u.office_id = o.id
+LEFT JOIN divisions div ON u.division_id = div.id;
+
+-- 일정 전체 정보 뷰 (작성자 및 조직 정보 포함)
+CREATE VIEW v_events_with_details AS
+SELECT 
+    e.id,
+    e.title,
+    e.content,
+    e.start_at,
+    e.end_at,
+    e.status,
+    e.completed_at,
+    e.alert,
+    e.series_id,
+    e.is_exception,
+    u.name AS creator_name,
+    u.id AS creator_id,
+    d.name AS department_name,
+    o.name AS office_name,
+    div.name AS division_name,
+    e.created_at,
+    e.updated_at
+FROM events e
+JOIN users u ON e.creator_id = u.id
+LEFT JOIN departments d ON e.department_id = d.id
+LEFT JOIN offices o ON e.office_id = o.id
+LEFT JOIN divisions div ON e.division_id = div.id;
+
+-- 댓글 전체 정보 뷰
+CREATE VIEW v_comments_with_details AS
+SELECT 
+    c.id,
+    c.content,
+    c.event_id,
+    c.series_id,
+    u.name AS author_name,
+    u.id AS author_id,
+    c.is_edited,
+    c.created_at,
+    c.updated_at
+FROM comments c
+JOIN users u ON c.author_id = u.id;
+
+-- ========================================
+-- 10. 권한 체크 함수 (헬퍼)
+-- ========================================
+
+-- 사용자가 일정을 볼 수 있는지 확인하는 함수
+CREATE OR REPLACE FUNCTION can_view_event(
+    p_user_id INTEGER,
+    p_event_division_id INTEGER,
+    p_event_office_id INTEGER,
+    p_event_department_id INTEGER
+) RETURNS BOOLEAN AS $$
+DECLARE
+    v_role user_role;
+    v_scope admin_scope;
+    v_user_division_id INTEGER;
+    v_user_office_id INTEGER;
+    v_user_department_id INTEGER;
+BEGIN
+    SELECT role, scope, division_id, office_id, department_id
+    INTO v_role, v_scope, v_user_division_id, v_user_office_id, v_user_department_id
+    FROM users WHERE id = p_user_id;
+    
+    -- ADMIN은 모든 일정 조회 가능
+    IF v_role = 'ADMIN' THEN
+        RETURN TRUE;
+    END IF;
+    
+    -- DEPT_LEAD는 scope에 따라 조회
+    IF v_role = 'DEPT_LEAD' THEN
+        IF v_scope = 'DIVISION' THEN
+            RETURN p_event_division_id = v_user_division_id;
+        ELSIF v_scope = 'OFFICE' THEN
+            RETURN p_event_office_id = v_user_office_id AND p_event_division_id = v_user_division_id;
+        ELSIF v_scope = 'DEPARTMENT' THEN
+            RETURN p_event_department_id = v_user_department_id;
+        END IF;
+    END IF;
+    
+    -- USER는 같은 부서만 조회
+    RETURN p_event_department_id = v_user_department_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================
+-- 완료!
+-- ========================================
+
+-- 스키마 정보 확인 쿼리
+SELECT 
+    schemaname,
+    tablename,
+    tableowner
+FROM pg_tables 
+WHERE schemaname = 'public'
+ORDER BY tablename;
