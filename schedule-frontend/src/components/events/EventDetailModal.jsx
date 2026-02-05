@@ -203,8 +203,12 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
           <div style={{ padding: '24px' }}>
             {!isEditing ? (
               <>
+                {/* 디버그 정보 */}
+                <div style={{ padding: '12px', marginBottom: '16px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '12px', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>
+                  디버그: {JSON.stringify({ hasEvent: !!event, id: event?.id, title: event?.title, startAt: event?.startAt }, null, 2)}
+                </div>
                 <div style={{ display: 'inline-block', padding: '6px 12px', borderRadius: '6px', backgroundColor: getStatusColor(event.status), color: '#fff', fontSize: '13px', fontWeight: '600', marginBottom: '16px' }}>{getStatusText(event.status)}</div>
-                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: textColor }}>{event.title}</h3>
+                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: textColor }}>제목: {event.title || '(없음)'}</h3>
                 {event.content && <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: bgColor, marginBottom: '16px', color: textColor, whiteSpace: 'pre-wrap' }}>{event.content}</div>}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: secondaryTextColor, fontSize: '14px', marginBottom: '8px' }}>
