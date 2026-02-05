@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Edit2, Trash2, Check, Calendar, Clock, User } from 'lucide-react';
 import api from '../../utils/api';
 
@@ -7,7 +7,8 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [actionInProgress, setActionInProgress] = useState(false); // 중복 클릭 방지
+  const [actionInProgress, setActionInProgress] = useState(false); // UI용
+  const actionInProgressRef = useRef(false); // 중복 클릭 방지용 ref
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -52,9 +53,21 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
     try {
       setLoading(true);
       setError('');
-      console.log('[EventDetailModal] Loading event with ID:', eventId);
+
       const data = await api.getEvent(eventId);
-      console.log('[EventDetailModal] Received event data:', data);
+
+      // 데이터 검증
+      if (!data) {
+        setError('일정 데이터를 받지 못했습니다.');
+        return;
+      }
+
+      // 데이터 구조 확인 - 디버깅용
+      if (!data.title || !data.startAt) {
+        setError(`데이터 구조 오류: ${JSON.stringify(Object.keys(data))}`);
+        return;
+      }
+
       setEvent(data);
       const start = formatDateTimeForInput(data.startAt);
       const end = formatDateTimeForInput(data.endAt);
@@ -67,8 +80,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         endTime: end.time
       });
     } catch (err) {
-      console.error('[EventDetailModal] Error loading event:', err);
-      setError('일정을 불러오는데 실패했습니다.');
+      setError(`일정 로드 실패: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -80,13 +92,14 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    
-    if (actionInProgress) return; // 중복 방지
-    
+
+    if (actionInProgressRef.current) return; // 중복 방지
+
     setError('');
     setLoading(true);
     setActionInProgress(true);
-    
+    actionInProgressRef.current = true;
+
     try {
       if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) {
         setError('모든 날짜와 시간을 입력해주세요.');
@@ -109,17 +122,19 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
     } finally {
       setLoading(false);
       setActionInProgress(false);
+      actionInProgressRef.current = false;
     }
   };
 
   const handleDelete = async () => {
-    if (actionInProgress) return; // 중복 방지
-    
+    if (actionInProgressRef.current) return; // 중복 방지
+
     if (!window.confirm('정말 이 일정을 삭제하시겠습니까?')) return;
-    
+
     setLoading(true);
     setActionInProgress(true);
-    
+    actionInProgressRef.current = true;
+
     try {
       await api.deleteEvent(eventId);
       onSuccess();
@@ -129,14 +144,16 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
     } finally {
       setLoading(false);
       setActionInProgress(false);
+      actionInProgressRef.current = false;
     }
   };
 
   const handleComplete = async () => {
-    if (actionInProgress) return; // 중복 방지
+    if (actionInProgressRef.current) return; // 중복 방지
 
     setLoading(true);
     setActionInProgress(true);
+    actionInProgressRef.current = true;
     setError('');
 
     try {
@@ -151,11 +168,11 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
       onSuccess();
 
     } catch (err) {
-      console.error('Complete/Uncomplete error:', err);
       setError(err.message || '상태 변경에 실패했습니다.');
     } finally {
       setLoading(false);
       setActionInProgress(false);
+      actionInProgressRef.current = false;
     }
   };
 
