@@ -1,0 +1,415 @@
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import api from '../../utils/api';
+import EventModal from '../events/EventModal';
+import EventDetailModal from '../events/EventDetailModal';  // 추가!
+
+export default function Calendar() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState([]);
+  const [darkMode] = useState(true);
+  const [isMobile] = useState(window.innerWidth <= 768);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedEventId, setSelectedEventId] = useState(null);  // 추가!
+  const [showDetailModal, setShowDetailModal] = useState(false);  // 추가!
+  const [selectedDay, setSelectedDay] = useState(null);  // 이게 있어야 함!
+  const bgColor = darkMode ? '#0f172a' : '#f1f5f9';
+  const cardBg = darkMode ? '#1e293b' : '#fff';
+  const textColor = darkMode ? '#e2e8f0' : '#1e293b';
+  const secondaryTextColor = darkMode ? '#94a3b8' : '#64748b';
+
+  useEffect(() => {
+    loadEvents();
+  }, [currentDate]);
+
+  const loadEvents = async () => {
+    try {
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      
+      const data = await api.getEvents({
+        startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: endOfMonth.toISOString().split('T')[0]
+      });
+      setEvents(data.data?.events || data.events || []);
+    } catch (error) {
+      console.error('Failed to load events:', error);
+    }
+  };
+
+  const getDaysInMonth = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
+    
+    // 빈 칸 추가
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    
+    // 날짜 추가
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+    
+    return days;
+  };
+
+
+  const handleNewEvent = (date = null) => {
+    if (date) {
+      setSelectedDate(date.toISOString().split('T')[0]);
+    } else {
+      setSelectedDate(new Date().toISOString().split('T')[0]);
+    }
+    setShowModal(true);
+  };
+
+  const handleEventClick = (eventId) => {
+    setSelectedEventId(eventId);
+    setShowDetailModal(true);
+  };
+
+  // 추가!
+  const handleDayClick = (day) => {
+    console.log('날짜 클릭:', day);  // 추가!
+    setSelectedDay(day);
+    setTimeout(() => {
+      document.getElementById('event-list')?.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    }, 100);
+  };
+
+
+
+  const handleEventSuccess = () => {
+    loadEvents(); // 일정 목록 새로고침
+  };
+
+  const days = getDaysInMonth();
+
+  return (
+    <div>
+      {/* Calendar Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: isMobile ? '16px' : '24px',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px' }}>
+          <button
+            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: textColor,
+              cursor: 'pointer',
+              padding: '4px'
+            }}
+          >
+            <ChevronLeft size={isMobile ? 20 : 24} />
+          </button>
+          <h2 style={{ fontSize: isMobile ? '20px' : '28px', fontWeight: '300', margin: 0 }}>
+            {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
+          </h2>
+          <button
+            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: textColor,
+              cursor: 'pointer',
+              padding: '4px'
+            }}
+          >
+            <ChevronRight size={isMobile ? 20 : 24} />
+          </button>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            style={{
+              padding: isMobile ? '8px 12px' : '10px 16px',
+              borderRadius: '8px',
+              border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+              backgroundColor: cardBg,
+              color: textColor,
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            오늘
+          </button>
+          <button
+            onClick={() => {
+              handleNewEvent();
+            }}
+            style={{
+              padding: isMobile ? '8px 12px' : '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: '#3B82F6',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Plus size={18} />
+            {!isMobile && '새 일정'}
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div style={{ marginBottom: isMobile ? '16px' : '24px' }}>
+        {/* Days Header */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: '1px',
+          marginBottom: '8px'
+        }}>
+          {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+            <div key={day} style={{
+              textAlign: 'center',
+              padding: isMobile ? '6px 4px' : '8px',
+              fontSize: isMobile ? '11px' : '13px',
+              color: index === 0 ? '#ef4444' : index === 6 ? '#3B82F6' : secondaryTextColor,
+              fontWeight: '600'
+            }}>
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Days Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: isMobile ? '4px' : '8px'
+        }}>
+          {days.map((day, index) => {
+            const isToday = day && day.toDateString() === new Date().toDateString();
+            const dayEvents = day ? events.filter(e => {
+              const eventDate = new Date(e.startAt).toDateString();
+              return eventDate === day.toDateString();
+            }) : [];
+
+            return (
+              <div
+                key={index}
+                onClick={() => day && handleDayClick(day)}  // 추가!
+                style={{
+                  minHeight: isMobile ? '50px' : '80px',
+                  padding: isMobile ? '6px' : '8px',
+                  borderRadius: isMobile ? '6px' : '8px',
+                  backgroundColor: day ? cardBg : 'transparent',
+                  cursor: day ? 'pointer' : 'default',
+                  position: 'relative',
+                  border: isToday ? `2px solid #3B82F6` : `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (day) e.currentTarget.style.backgroundColor = darkMode ? '#2d3748' : '#f7fafc';
+                }}
+                onMouseLeave={(e) => {
+                  if (day) e.currentTarget.style.backgroundColor = cardBg;
+                }}
+              >
+                {day && (
+                  <>
+                    <div style={{
+                      fontSize: isMobile ? '13px' : '16px',
+                      fontWeight: isToday ? '600' : '400',
+                      color: isToday ? '#3B82F6' : textColor,
+                      marginBottom: '4px'
+                    }}>
+                      {day.getDate()}
+                    </div>
+                    {!isMobile && dayEvents.slice(0, 2).map((event, idx) => (
+                      <div key={idx} style={{
+                        fontSize: '11px',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        backgroundColor: event.status === 'DONE' ? '#10B981' : '#3B82F6',
+                        color: '#fff',
+                        marginBottom: '2px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {event.title}
+                      </div>
+                    ))}
+                    {dayEvents.length > 2 && !isMobile && (
+                      <div style={{ fontSize: '10px', color: secondaryTextColor }}>
+                        +{dayEvents.length - 2}개
+                      </div>
+                    )}
+                    {isMobile && dayEvents.length > 0 && (
+                      <div style={{
+                        fontSize: '10px',
+                        color: '#3B82F6',
+                        fontWeight: '600'
+                      }}>
+                        {dayEvents.length}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Events List */}
+      {/* Events List */}
+      <div id="event-list">
+        <h3 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '600', marginBottom: '16px' }}>
+          {selectedDay 
+            ? `${selectedDay.getMonth() + 1}월 ${selectedDay.getDate()}일 일정`
+            : `이번 달 일정 (${events.length}개)`
+          }
+          {selectedDay && (
+            <button
+              onClick={() => setSelectedDay(null)}
+              style={{
+                marginLeft: '12px',
+                padding: '4px 12px',
+                fontSize: '12px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#334155',
+                color: '#e2e8f0',
+                cursor: 'pointer'
+              }}
+            >
+              전체 보기
+            </button>
+          )}
+        </h3>
+        {(selectedDay 
+          ? events.filter(e => {
+              const eventDate = new Date(e.startAt);
+              return eventDate.getFullYear() === selectedDay.getFullYear() &&
+                     eventDate.getMonth() === selectedDay.getMonth() &&
+                     eventDate.getDate() === selectedDay.getDate();
+            })
+          : events
+        ).length === 0 ? (
+
+          <div style={{
+            textAlign: 'center',
+            padding: '40px 20px',
+            color: secondaryTextColor
+          }}>
+            일정이 없습니다. 새 일정을 추가해보세요!
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {(selectedDay 
+              ? events.filter(e => {
+                  const eventDate = new Date(e.startAt);
+                  return eventDate.getFullYear() === selectedDay.getFullYear() &&
+                         eventDate.getMonth() === selectedDay.getMonth() &&
+                         eventDate.getDate() === selectedDay.getDate();
+                })
+              : events
+            ).slice(0, 20).map(event => (
+              <div key={event.id} 
+                onClick={() => handleEventClick(event.id)}  // 추가!
+                style={{
+                padding: isMobile ? '12px' : '16px',
+                borderRadius: '12px',
+                backgroundColor: cardBg,
+                border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#2d3748' : '#f7fafc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = cardBg;
+              }}
+              >
+                <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '6px' }}>
+                  {event.title}
+                </div>
+                <div style={{ fontSize: '13px', color: secondaryTextColor }}>
+                  {new Date(event.startAt).toLocaleString('ko-KR', {
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                  {event.status === 'DONE' && (
+                    <span style={{
+                      marginLeft: '8px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: '#10B981',
+                      color: '#fff',
+                      fontSize: '11px'
+                    }}>
+                      완료
+                    </span>
+                  )}
+                  {event.status === 'OVERDUE' && (
+                    <span style={{
+                      marginLeft: '8px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: '#ef4444',
+                      color: '#fff',
+                      fontSize: '11px'
+                    }}>
+                      지연
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Event Modal */}
+    <EventModal
+      isOpen={showModal}
+      onClose={() => setShowModal(false)}
+      onSuccess={handleEventSuccess}
+      selectedDate={selectedDate}
+    />
+
+      {/* 추가! */}
+      <EventDetailModal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        eventId={selectedEventId}
+        onSuccess={handleEventSuccess}
+      />
+    
+    </div>
+  );
+}
+
+
+
