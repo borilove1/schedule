@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
+import NotificationBell from '../notifications/NotificationBell';
 
 export default function MainLayout({ children }) {
   const { user, logout } = useAuth();
@@ -74,7 +75,9 @@ export default function MainLayout({ children }) {
           >
             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
-          
+
+          <NotificationBell darkMode={darkMode} textColor={textColor} />
+
           <button
             onClick={logout}
             style={{
