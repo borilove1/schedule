@@ -56,6 +56,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
 
       const data = await api.getEvent(eventId);
 
+      // 디버깅: 받은 데이터 alert로 표시
+      alert('받은 데이터: ' + JSON.stringify(data, null, 2));
+
       // 데이터 검증
       if (!data) {
         setError('일정 데이터를 받지 못했습니다.');
@@ -80,6 +83,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         endTime: end.time
       });
     } catch (err) {
+      alert('에러 발생: ' + err.message);
       setError(`일정 로드 실패: ${err.message}`);
     } finally {
       setLoading(false);
