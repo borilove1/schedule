@@ -1,15 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Clock, CheckCircle, Edit, Trash2, Info, Bell } from 'lucide-react';
 import { getRelativeTime, NOTIFICATION_TYPES } from '../../utils/mockNotifications';
+import api from '../../utils/api';
 
 export default function NotificationModal({
   isOpen,
   onClose,
-  darkMode,
-  notifications,
-  onNotificationsUpdate
+  darkMode
 }) {
   const [filter, setFilter] = useState('all'); // 'all' or 'unread'
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const actionInProgressRef = useRef(false);
 
   // Color scheme
@@ -20,6 +22,28 @@ export default function NotificationModal({
   const borderColor = darkMode ? '#334155' : '#e2e8f0';
   const unreadBg = darkMode ? '#1e3a5f' : '#eff6ff';
   const hoverBg = darkMode ? '#334155' : '#f8fafc';
+
+  // Load notifications
+  const loadNotifications = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { notifications: loadedNotifications } = await api.getNotifications();
+      setNotifications(loadedNotifications || []);
+    } catch (err) {
+      console.error('Failed to load notifications:', err);
+      setError(err.message || '알림을 불러올 수 없습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load notifications when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadNotifications();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -48,26 +72,45 @@ export default function NotificationModal({
   };
 
   // Mark single notification as read
-  const handleMarkAsRead = (notificationId) => {
+  const handleMarkAsRead = async (notificationId) => {
     if (actionInProgressRef.current) return;
     actionInProgressRef.current = true;
 
-    const updatedNotifications = notifications.map(n =>
-      n.id === notificationId ? { ...n, isRead: true } : n
-    );
+    try {
+      await api.markNotificationAsRead(notificationId);
 
-    onNotificationsUpdate(updatedNotifications);
-    actionInProgressRef.current = false;
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
+        )
+      );
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+      setError(err.message || '알림 읽음 처리에 실패했습니다.');
+    } finally {
+      actionInProgressRef.current = false;
+    }
   };
 
   // Mark all notifications as read
-  const handleMarkAllAsRead = () => {
+  const handleMarkAllAsRead = async () => {
     if (actionInProgressRef.current) return;
     actionInProgressRef.current = true;
 
-    const updatedNotifications = notifications.map(n => ({ ...n, isRead: true }));
-    onNotificationsUpdate(updatedNotifications);
-    actionInProgressRef.current = false;
+    try {
+      await api.markAllNotificationsAsRead();
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() }))
+      );
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+      setError(err.message || '모두 읽음 처리에 실패했습니다.');
+    } finally {
+      actionInProgressRef.current = false;
+    }
   };
 
   // Handle notification click
@@ -77,7 +120,7 @@ export default function NotificationModal({
       handleMarkAsRead(notification.id);
     }
 
-    // TODO Phase 2: Navigate to related event if relatedEventId exists
+    // TODO Phase 3: Navigate to related event if relatedEventId exists
     // if (notification.relatedEventId) {
     //   // Navigate to event detail
     // }
@@ -200,7 +243,49 @@ export default function NotificationModal({
             padding: '0'
           }}
         >
-          {filteredNotifications.length === 0 ? (
+          {/* Error Message */}
+          {error && (
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#7f1d1d',
+                color: '#fca5a5',
+                fontSize: '14px'
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading ? (
+            <div
+              style={{
+                padding: '48px 24px',
+                textAlign: 'center',
+                color: secondaryTextColor
+              }}
+            >
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  border: '4px solid #334155',
+                  borderTop: '4px solid #3B82F6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto 16px'
+                }}
+              ></div>
+              <p style={{ margin: 0, fontSize: '14px' }}>로딩 중...</p>
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          ) : filteredNotifications.length === 0 ? (
             // Empty State
             <div
               style={{
@@ -313,7 +398,7 @@ export default function NotificationModal({
         </div>
 
         {/* Footer */}
-        {notifications.filter(n => !n.isRead).length > 0 && (
+        {!loading && notifications.filter(n => !n.isRead).length > 0 && (
           <div
             style={{
               padding: '16px 24px',
@@ -324,22 +409,28 @@ export default function NotificationModal({
           >
             <button
               onClick={handleMarkAllAsRead}
+              disabled={actionInProgressRef.current}
               style={{
                 padding: '10px 20px',
                 borderRadius: '8px',
                 border: `1px solid ${borderColor}`,
                 backgroundColor: 'transparent',
                 color: textColor,
-                cursor: 'pointer',
+                cursor: actionInProgressRef.current ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                opacity: actionInProgressRef.current ? 0.6 : 1
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = hoverBg;
+                if (!actionInProgressRef.current) {
+                  e.currentTarget.style.backgroundColor = hoverBg;
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
+                if (!actionInProgressRef.current) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
               }}
             >
               모두 읽음 처리

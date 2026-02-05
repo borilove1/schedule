@@ -13,6 +13,7 @@ const organizationRoutes = require('./routes/organizations');
 const eventRoutes = require('./routes/events');
 const commentRoutes = require('./routes/comments');
 const settingsRoutes = require('./routes/settings');
+const notificationRoutes = require('./routes/notifications');
 
 // 미들웨어 임포트
 const errorHandler = require('./middleware/errorHandler');
@@ -83,6 +84,7 @@ app.use('/api/v1/organizations', organizationRoutes);
 app.use('/api/v1/events', eventRoutes);
 app.use('/api/v1/comments', commentRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // 404 처리
 app.use((req, res) => {

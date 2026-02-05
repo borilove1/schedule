@@ -1,30 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import NotificationModal from './NotificationModal';
-import { generateMockNotifications } from '../../utils/mockNotifications';
+import api from '../../utils/api';
 
 export default function NotificationBell({ darkMode, textColor }) {
   const [showModal, setShowModal] = useState(false);
-  const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Load mock notifications on mount
-  useEffect(() => {
-    const mockNotifications = generateMockNotifications();
-    setNotifications(mockNotifications);
+  // Load unread count on mount and periodically
+  const loadUnreadCount = async () => {
+    try {
+      const { count } = await api.getUnreadNotificationCount();
+      setUnreadCount(count || 0);
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  };
 
-    // Calculate unread count
-    const count = mockNotifications.filter(n => !n.isRead).length;
-    setUnreadCount(count);
+  useEffect(() => {
+    loadUnreadCount();
+
+    // Poll for unread count every 60 seconds
+    const interval = setInterval(loadUnreadCount, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Handle notification updates from modal
-  const handleNotificationsUpdate = (updatedNotifications) => {
-    setNotifications(updatedNotifications);
-
-    // Recalculate unread count
-    const count = updatedNotifications.filter(n => !n.isRead).length;
-    setUnreadCount(count);
+  // Refresh unread count when modal closes
+  const handleModalClose = () => {
+    setShowModal(false);
+    loadUnreadCount();
   };
 
   return (
@@ -74,10 +78,8 @@ export default function NotificationBell({ darkMode, textColor }) {
 
       <NotificationModal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={handleModalClose}
         darkMode={darkMode}
-        notifications={notifications}
-        onNotificationsUpdate={handleNotificationsUpdate}
       />
     </>
   );
