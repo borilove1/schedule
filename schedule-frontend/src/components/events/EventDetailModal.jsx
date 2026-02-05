@@ -131,26 +131,26 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
 
   const handleComplete = async () => {
     if (actionInProgress) return; // 중복 방지
-    
+
     setLoading(true);
     setActionInProgress(true);
-    
+    setError('');
+
     try {
       if (event.status === 'DONE') {
         await api.uncompleteEvent(eventId);
       } else {
         await api.completeEvent(eventId);
       }
+
+      // 상태 업데이트 후 일정 다시 로드
+      await loadEvent();
       onSuccess();
-      
-      // 1초 후에 다시 로드 (DB 반영 대기)
-      setTimeout(async () => {
-        await loadEvent();
-        setActionInProgress(false);
-      }, 1000);
-      
+
     } catch (err) {
-      setError('상태 변경에 실패했습니다.');
+      console.error('Complete/Uncomplete error:', err);
+      setError(err.message || '상태 변경에 실패했습니다.');
+    } finally {
       setLoading(false);
       setActionInProgress(false);
     }

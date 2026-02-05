@@ -111,6 +111,12 @@ class ApiClient {
     });
   }
 
+  async uncompleteEvent(id) {
+    return this.request(`/events/${id}/uncomplete`, {
+      method: 'POST',
+    });
+  }
+
   // 댓글
   async addComment(eventId, content) {
     return this.request(`/comments/events/${eventId}`, {
@@ -141,96 +147,3 @@ class ApiClient {
 
 export const api = new ApiClient();
 export default api;
-
-// api.js에 추가할 함수들
-
-// 일정 상세 조회
-export const getEvent = async (eventId) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`/api/v1/events/${eventId}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('일정 조회에 실패했습니다.');
-  }
-
-  const data = await response.json();
-  return data.success ? data.data : data;
-};
-
-// 일정 수정
-export const updateEvent = async (eventId, eventData) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`/api/v1/events/${eventId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(eventData)
-  });
-
-  if (!response.ok) {
-    throw new Error('일정 수정에 실패했습니다.');
-  }
-
-  const data = await response.json();
-  return data.success ? data.data : data;
-};
-
-// 일정 삭제
-export const deleteEvent = async (eventId) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`/api/v1/events/${eventId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('일정 삭제에 실패했습니다.');
-  }
-
-  const data = await response.json();
-  return data.success ? data.data : data;
-};
-
-// 일정 완료 처리
-export const completeEvent = async (eventId) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`/api/v1/events/${eventId}/complete`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('완료 처리에 실패했습니다.');
-  }
-
-  const data = await response.json();
-  return data.success ? data.data : data;
-};
-
-// 일정 완료 취소
-export const uncompleteEvent = async (eventId) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`/api/v1/events/${eventId}/uncomplete`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('완료 취소에 실패했습니다.');
-  }
-
-  const data = await response.json();
-  return data.success ? data.data : data;
-};

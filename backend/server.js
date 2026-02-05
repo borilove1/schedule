@@ -51,7 +51,19 @@ const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   message: '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.'
 });
-app.use('/api/', limiter);
+
+// 일반 API에 적용 (인증 제외)
+app.use('/api/v1/auth', limiter);
+
+// 이벤트 API는 더 관대한 제한 적용
+const eventsLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1분
+  max: 30, // 1분에 30번
+  message: '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/v1/events', eventsLimiter);
 
 // ========== 라우트 설정 ==========
 
