@@ -61,6 +61,7 @@ function generateOccurrencesFromSeries(series, startDate, endDate, exceptions = 
         occurrence_date: occurrenceDateStr,
         is_exception: false,
         creator_id: series.creator_id,
+        creator_name: series.creator_name || null,
         department_id: series.department_id,
         office_id: series.office_id,
         division_id: series.division_id,

@@ -422,7 +422,8 @@ export default function Calendar() {
                   <div style={{ position: 'relative', height: `${multiAreaHeight}px` }}>
                     {visibleLanes.map((lane, laneIdx) =>
                       lane.map(bar => {
-                        const statusColor = getStatusColor(bar.event.status);
+                        const isOwn = bar.event.creator?.id === user?.id;
+                        const barColor = isOwn ? getStatusColor(bar.event.status) : '#94a3b8';
                         const colWidth = 100 / 7;
                         const left = (bar.startCol - 1) * colWidth;
                         const width = (bar.endCol - bar.startCol + 1) * colWidth;
@@ -437,9 +438,9 @@ export default function Calendar() {
                               height: '18px',
                               fontSize: '10px',
                               padding: '2px 6px',
-                              backgroundColor: statusColor + (isDarkMode ? '45' : '30'),
-                              color: statusColor,
-                              borderLeft: bar.isStartInWeek ? `3px solid ${statusColor}` : 'none',
+                              backgroundColor: barColor + (isDarkMode ? '45' : '30'),
+                              color: isOwn ? barColor : (isDarkMode ? '#cbd5e1' : '#64748b'),
+                              borderLeft: bar.isStartInWeek ? `3px solid ${barColor}` : 'none',
                               borderRadius: `${bar.isStartInWeek ? '4px' : '0'} ${bar.isEndInWeek ? '4px' : '0'} ${bar.isEndInWeek ? '4px' : '0'} ${bar.isStartInWeek ? '4px' : '0'}`,
                               overflow: 'hidden',
                               whiteSpace: 'nowrap',
@@ -449,6 +450,7 @@ export default function Calendar() {
                               boxSizing: 'border-box'
                             }}
                           >
+                            {!isOwn && bar.isStartInWeek && <span>{bar.event.creator?.name} </span>}
                             {bar.event.title}
                           </div>
                         );
@@ -481,27 +483,31 @@ export default function Calendar() {
 
                     return (
                       <div key={col} style={{ padding: '0 3px' }}>
-                        {singles.slice(0, showSingles).map(ev => (
-                          <div
-                            key={ev.id}
-                            style={{
-                              fontSize: '10px',
-                              padding: '2px 4px',
-                              borderRadius: '3px',
-                              backgroundColor: getStatusColor(ev.status) + (isDarkMode ? '35' : '28'),
-                              color: getStatusColor(ev.status),
-                              borderLeft: `3px solid ${getStatusColor(ev.status)}`,
-                              marginBottom: '1px',
-                              overflow: 'hidden',
-                              whiteSpace: 'nowrap',
-                              textOverflow: 'ellipsis',
-                              fontWeight: '500',
-                              lineHeight: '14px'
-                            }}
-                          >
-                            {ev.title}
-                          </div>
-                        ))}
+                        {singles.slice(0, showSingles).map(ev => {
+                          const isOwn = ev.creator?.id === user?.id;
+                          const barColor = isOwn ? getStatusColor(ev.status) : '#94a3b8';
+                          return (
+                            <div
+                              key={ev.id}
+                              style={{
+                                fontSize: '10px',
+                                padding: '2px 4px',
+                                borderRadius: '3px',
+                                backgroundColor: barColor + (isDarkMode ? '35' : '28'),
+                                color: isOwn ? barColor : (isDarkMode ? '#cbd5e1' : '#64748b'),
+                                borderLeft: `3px solid ${barColor}`,
+                                marginBottom: '1px',
+                                overflow: 'hidden',
+                                whiteSpace: 'nowrap',
+                                textOverflow: 'ellipsis',
+                                fontWeight: '500',
+                                lineHeight: '14px'
+                              }}
+                            >
+                              {ev.title}
+                            </div>
+                          );
+                        })}
                         {hiddenCount > 0 && (
                           <div style={{ fontSize: '10px', color: secondaryTextColor, textAlign: 'center' }}>
                             +{hiddenCount}
@@ -601,6 +607,7 @@ export default function Calendar() {
               const startDate = new Date(event.startAt);
               const endDate = new Date(event.endAt);
               const isMultiDayEvent = norm(startDate).getTime() !== norm(endDate).getTime();
+              const isOwnEvent = event.creator?.id === user?.id;
 
               return (
                 <div
@@ -611,7 +618,7 @@ export default function Calendar() {
                     borderRadius: '10px',
                     backgroundColor: cardBg,
                     border: `1px solid ${borderColor}`,
-                    borderLeft: `4px solid ${getStatusColor(event.status)}`,
+                    borderLeft: `4px solid ${isOwnEvent ? getStatusColor(event.status) : '#94a3b8'}`,
                     cursor: 'pointer',
                     transition: 'transform 0.15s ease, box-shadow 0.15s ease'
                   }}
@@ -630,8 +637,24 @@ export default function Calendar() {
                     alignItems: 'center',
                     marginBottom: '6px'
                   }}>
-                    <div style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: '600', color: textColor }}>
-                      {event.title}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: '600', color: textColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {event.title}
+                      </div>
+                      {!isOwnEvent && event.creator?.name && (
+                        <span style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          backgroundColor: isDarkMode ? '#334155' : '#f1f5f9',
+                          color: secondaryTextColor,
+                          fontWeight: '500',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
+                        }}>
+                          {event.creator.name}
+                        </span>
+                      )}
                     </div>
                     <div style={{
                       fontSize: '11px',
@@ -640,7 +663,8 @@ export default function Calendar() {
                       backgroundColor: getStatusColor(event.status) + '30',
                       color: getStatusColor(event.status),
                       fontWeight: '600',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
                     }}>
                       {getStatusText(event.status)}
                     </div>

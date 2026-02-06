@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Trash2, Check, Calendar, Clock, User, Repeat } from 'lucide-react';
+import { X, Edit2, Trash2, Check, Calendar, Clock, User, Repeat, Eye } from 'lucide-react';
 import api from '../../utils/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }) {
+  const { user: currentUser } = useAuth();
   const { refreshNotifications } = useNotification();
   const { isDarkMode } = useTheme();
   const [event, setEvent] = useState(null);
@@ -309,7 +311,15 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
           <div style={{ padding: '24px' }}>
             {!isEditing ? (
               <>
-                <div style={{ display: 'inline-block', padding: '6px 12px', borderRadius: '6px', backgroundColor: getStatusColor(event.status), color: '#fff', fontSize: '13px', fontWeight: '600', marginBottom: '16px' }}>{getStatusText(event.status)}</div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ display: 'inline-block', padding: '6px 12px', borderRadius: '6px', backgroundColor: getStatusColor(event.status), color: '#fff', fontSize: '13px', fontWeight: '600' }}>{getStatusText(event.status)}</div>
+                  {!(event.isOwner ?? (event.creator?.id === currentUser?.id)) && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', color: secondaryTextColor, fontSize: '13px', fontWeight: '500' }}>
+                      <Eye size={14} />
+                      조회 전용
+                    </div>
+                  )}
+                </div>
                 <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: textColor }}>제목: {event.title || '(없음)'}</h3>
                 {event.content && <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: bgColor, marginBottom: '16px', color: textColor, whiteSpace: 'pre-wrap' }}>{event.content}</div>}
                 <div style={{ marginBottom: '16px' }}>
@@ -330,11 +340,17 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                 </div>
                 {error && <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2', color: isDarkMode ? '#fca5a5' : '#dc2626', fontSize: '14px', marginBottom: '16px' }}>{error}</div>}
                 {actionInProgress && <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#1e40af', color: '#93c5fd', fontSize: '14px', marginBottom: '16px', textAlign: 'center' }}>처리 중...</div>}
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <button onClick={handleCompleteClick} disabled={loading || actionInProgress} style={{ flex: 1, padding: '12px 24px', borderRadius: '8px', border: 'none', backgroundColor: (loading || actionInProgress) ? '#64748b' : (event.status === 'DONE' ? '#64748b' : '#10B981'), color: '#fff', cursor: (loading || actionInProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (loading || actionInProgress) ? 0.5 : 1, fontFamily }}><Check size={18} />{event.status === 'DONE' ? '완료 취소' : '완료 처리'}</button>
-                  <button onClick={() => { if (event.seriesId || event.isRecurring) { setShowEditTypeDialog(true); } else { setEditType('this'); setIsEditing(true); } }} disabled={loading || actionInProgress} style={{ flex: 1, padding: '12px 24px', borderRadius: '8px', border: `1px solid ${borderColor}`, backgroundColor: 'transparent', color: textColor, cursor: (loading || actionInProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (loading || actionInProgress) ? 0.5 : 1, fontFamily }}><Edit2 size={18} />수정</button>
-                  <button onClick={handleDeleteClick} disabled={loading || actionInProgress} style={{ padding: '12px 24px', borderRadius: '8px', border: 'none', backgroundColor: (loading || actionInProgress) ? '#991b1b' : '#ef4444', color: '#fff', cursor: (loading || actionInProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (loading || actionInProgress) ? 0.5 : 1, fontFamily }}><Trash2 size={18} />삭제</button>
-                </div>
+                {(event.isOwner ?? (event.creator?.id === currentUser?.id)) ? (
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button onClick={handleCompleteClick} disabled={loading || actionInProgress} style={{ flex: 1, padding: '12px 24px', borderRadius: '8px', border: 'none', backgroundColor: (loading || actionInProgress) ? '#64748b' : (event.status === 'DONE' ? '#64748b' : '#10B981'), color: '#fff', cursor: (loading || actionInProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (loading || actionInProgress) ? 0.5 : 1, fontFamily }}><Check size={18} />{event.status === 'DONE' ? '완료 취소' : '완료 처리'}</button>
+                    <button onClick={() => { if (event.seriesId || event.isRecurring) { setShowEditTypeDialog(true); } else { setEditType('this'); setIsEditing(true); } }} disabled={loading || actionInProgress} style={{ flex: 1, padding: '12px 24px', borderRadius: '8px', border: `1px solid ${borderColor}`, backgroundColor: 'transparent', color: textColor, cursor: (loading || actionInProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (loading || actionInProgress) ? 0.5 : 1, fontFamily }}><Edit2 size={18} />수정</button>
+                    <button onClick={handleDeleteClick} disabled={loading || actionInProgress} style={{ padding: '12px 24px', borderRadius: '8px', border: 'none', backgroundColor: (loading || actionInProgress) ? '#991b1b' : '#ef4444', color: '#fff', cursor: (loading || actionInProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', opacity: (loading || actionInProgress) ? 0.5 : 1, fontFamily }}><Trash2 size={18} />삭제</button>
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', color: secondaryTextColor, fontSize: '14px', textAlign: 'center' }}>
+                    다른 사용자의 일정은 조회만 가능합니다.
+                  </div>
+                )}
               </>
             ) : (
               <form onSubmit={handleUpdate}>

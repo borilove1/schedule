@@ -38,6 +38,26 @@ function formatEventRow(row) {
 }
 
 /**
+ * 직급별 조회 스코프 필터 생성
+ * ADMIN: 전체 조회 / 본부장: 본부 내 / 처장·실장: 처 내 / 부장: 부서 내 / 그 외: 본인만
+ */
+function buildScopeFilter(user, startParamIdx = 1, eventAlias = 'e', userAlias = 'u') {
+  if (user.role === 'ADMIN') {
+    return { clause: '1=1', params: [], nextParamIdx: startParamIdx };
+  }
+  if (user.position === '본부장' && user.divisionId) {
+    return { clause: `${userAlias}.division_id = $${startParamIdx}`, params: [user.divisionId], nextParamIdx: startParamIdx + 1 };
+  }
+  if (['처장', '실장'].includes(user.position) && user.officeId) {
+    return { clause: `${userAlias}.office_id = $${startParamIdx}`, params: [user.officeId], nextParamIdx: startParamIdx + 1 };
+  }
+  if (user.position === '부장' && user.departmentId) {
+    return { clause: `${userAlias}.department_id = $${startParamIdx}`, params: [user.departmentId], nextParamIdx: startParamIdx + 1 };
+  }
+  return { clause: `${eventAlias}.creator_id = $${startParamIdx}`, params: [user.id], nextParamIdx: startParamIdx + 1 };
+}
+
+/**
  * 일정 목록 조회 (반복 일정 자동 확장)
  */
 exports.getEvents = async (req, res) => {
@@ -45,57 +65,62 @@ exports.getEvents = async (req, res) => {
     const { startDate, endDate } = req.query;
     const userId = req.user.id;
 
+    // 직급별 조회 스코프 필터
+    const scope = buildScopeFilter(req.user, 1, 'e', 'u');
+
     // 1. 일반 일정 조회 (series_id가 null인 것)
     const regularEventsQuery = `
-      SELECT e.*, 
-             u.name as creator_name, 
-             d.name as department_name, 
-             o.name as office_name, 
+      SELECT e.*,
+             u.name as creator_name,
+             d.name as department_name,
+             o.name as office_name,
              dv.name as division_name
       FROM events e
       JOIN users u ON e.creator_id = u.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN offices o ON e.office_id = o.id
       LEFT JOIN divisions dv ON e.division_id = dv.id
-      WHERE e.creator_id = $1
+      WHERE ${scope.clause}
       AND e.series_id IS NULL
-      AND e.start_at BETWEEN $2 AND $3
+      AND e.start_at BETWEEN $${scope.nextParamIdx} AND $${scope.nextParamIdx + 1}
       ORDER BY e.start_at
     `;
-    const regularResult = await query(regularEventsQuery, [userId, startDate, endDate]);
+    const regularResult = await query(regularEventsQuery, [...scope.params, startDate, endDate]);
     const regularEvents = regularResult.rows;
 
     // 2. 예외 일정 조회 (is_exception = true)
     const exceptionEventsQuery = `
-      SELECT e.*, 
-             u.name as creator_name, 
-             d.name as department_name, 
-             o.name as office_name, 
+      SELECT e.*,
+             u.name as creator_name,
+             d.name as department_name,
+             o.name as office_name,
              dv.name as division_name
       FROM events e
       JOIN users u ON e.creator_id = u.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN offices o ON e.office_id = o.id
       LEFT JOIN divisions dv ON e.division_id = dv.id
-      WHERE e.creator_id = $1
+      WHERE ${scope.clause}
       AND e.is_exception = true
-      AND e.start_at BETWEEN $2 AND $3
+      AND e.start_at BETWEEN $${scope.nextParamIdx} AND $${scope.nextParamIdx + 1}
       ORDER BY e.start_at
     `;
-    const exceptionResult = await query(exceptionEventsQuery, [userId, startDate, endDate]);
+    const exceptionResult = await query(exceptionEventsQuery, [...scope.params, startDate, endDate]);
     const exceptionEvents = exceptionResult.rows;
 
     // 3. 반복 일정 시리즈 조회
+    const seriesScope = buildScopeFilter(req.user, 1, 'es', 'u');
     const seriesQuery = `
-      SELECT * FROM event_series
-      WHERE creator_id = $1
+      SELECT es.*, u.name as creator_name FROM event_series es
+      JOIN users u ON es.creator_id = u.id
+      WHERE ${seriesScope.clause}
       AND (
-        recurrence_end_date IS NULL 
-        OR recurrence_end_date >= $2
+        es.recurrence_end_date IS NULL
+        OR es.recurrence_end_date >= $${seriesScope.nextParamIdx}
       )
-      AND first_occurrence_date <= $3
+      AND es.first_occurrence_date <= $${seriesScope.nextParamIdx + 1}
     `;
-    const seriesResult = await query(seriesQuery, [userId, startDate, endDate]);
+    const seriesResult = await query(seriesQuery, [...seriesScope.params, startDate, endDate]);
     const seriesList = seriesResult.rows;
 
     // 4. 예외 날짜 조회
@@ -152,6 +177,7 @@ exports.getEvents = async (req, res) => {
         id: event.creator_id,
         name: event.creator_name
       },
+      isOwner: event.creator_id === userId,
       department: event.department_name,
       office: event.office_name,
       division: event.division_name,
@@ -752,22 +778,23 @@ exports.getEventById = async (req, res) => {
       const seriesId = parts[1];
       const occurrenceTimestamp = parts[2];
       
-      // event_series 조회
+      // event_series 조회 (직급별 스코프 적용)
+      const detailScope = buildScopeFilter(req.user, 2, 'es', 'u');
       const seriesQuery = `
-        SELECT es.*, 
-               u.name as creator_name, 
-               d.name as department_name, 
-               o.name as office_name, 
+        SELECT es.*,
+               u.name as creator_name,
+               d.name as department_name,
+               o.name as office_name,
                dv.name as division_name
         FROM event_series es
         JOIN users u ON es.creator_id = u.id
         LEFT JOIN departments d ON es.department_id = d.id
         LEFT JOIN offices o ON es.office_id = o.id
         LEFT JOIN divisions dv ON es.division_id = dv.id
-        WHERE es.id = $1 AND es.creator_id = $2
+        WHERE es.id = $1 AND (${detailScope.clause})
       `;
-      
-      const result = await query(seriesQuery, [seriesId, userId]);
+
+      const result = await query(seriesQuery, [seriesId, ...detailScope.params]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'Event series not found' });
@@ -782,12 +809,11 @@ exports.getEventById = async (req, res) => {
       // 이 날짜에 완료된 예외 이벤트가 있는지 확인
       const exceptionEventQuery = `
         SELECT * FROM events
-        WHERE series_id = $1 
-        AND is_exception = true 
+        WHERE series_id = $1
+        AND is_exception = true
         AND DATE(start_at) = $2
-        AND creator_id = $3
       `;
-      const exceptionResult = await query(exceptionEventQuery, [seriesId, occurrenceDateStr, userId]);
+      const exceptionResult = await query(exceptionEventQuery, [seriesId, occurrenceDateStr]);
       
       // 시리즈 자체의 상태를 기본값으로 사용
       let status = series.status || 'PENDING';
@@ -826,6 +852,7 @@ exports.getEventById = async (req, res) => {
           id: series.creator_id,
           name: series.creator_name
         },
+        isOwner: series.creator_id === req.user.id,
         department: series.department_name,
         office: series.office_name,
         division: series.division_name,
@@ -839,22 +866,23 @@ exports.getEventById = async (req, res) => {
       });
     }
 
-    // 일반 일정인 경우
+    // 일반 일정인 경우 (직급별 스코프 적용)
+    const eventScope = buildScopeFilter(req.user, 2, 'e', 'u');
     const eventQuery = `
-      SELECT e.*, 
-             u.name as creator_name, 
-             d.name as department_name, 
-             o.name as office_name, 
+      SELECT e.*,
+             u.name as creator_name,
+             d.name as department_name,
+             o.name as office_name,
              dv.name as division_name
       FROM events e
       JOIN users u ON e.creator_id = u.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN offices o ON e.office_id = o.id
       LEFT JOIN divisions dv ON e.division_id = dv.id
-      WHERE e.id = $1 AND e.creator_id = $2
+      WHERE e.id = $1 AND (${eventScope.clause})
     `;
-    
-    const result = await query(eventQuery, [id, userId]);
+
+    const result = await query(eventQuery, [id, ...eventScope.params]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
@@ -881,6 +909,7 @@ exports.getEventById = async (req, res) => {
         id: event.creator_id,
         name: event.creator_name
       },
+      isOwner: event.creator_id === req.user.id,
       department: event.department_name,
       office: event.office_name,
       division: event.division_name,
