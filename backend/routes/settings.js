@@ -13,10 +13,10 @@ router.get('/', async (req, res, next) => {
   try {
     const result = await query('SELECT key, value FROM system_settings ORDER BY key');
     
-    // 객체 형태로 변환
+    // 객체 형태로 변환 (JSONB는 pg 드라이버가 자동 파싱)
     const settings = {};
     result.rows.forEach(row => {
-      settings[row.key] = JSON.parse(row.value);
+      settings[row.key] = row.value;
     });
 
     res.json({
@@ -75,7 +75,7 @@ router.get('/:key', async (req, res, next) => {
       success: true,
       data: {
         key: result.rows[0].key,
-        value: JSON.parse(result.rows[0].value),
+        value: result.rows[0].value,
         description: result.rows[0].description
       }
     });
@@ -108,7 +108,7 @@ router.put('/:key', async (req, res, next) => {
       success: true,
       data: {
         key: result.rows[0].key,
-        value: JSON.parse(result.rows[0].value),
+        value: result.rows[0].value,
         updatedAt: result.rows[0].updated_at
       }
     });

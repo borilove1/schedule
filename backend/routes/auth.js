@@ -11,12 +11,14 @@ const router = express.Router();
 router.post('/register',
   [
     body('email').isEmail().withMessage('유효한 이메일을 입력하세요'),
-    body('password').isLength({ min: 4 }).withMessage('비밀번호는 최소 4자 이상이어야 합니다'),
+    body('password')
+      .isLength({ min: 8 }).withMessage('비밀번호는 최소 8자 이상이어야 합니다')
+      .matches(/(?=.*[a-zA-Z])(?=.*\d)/).withMessage('비밀번호는 영문과 숫자를 모두 포함해야 합니다'),
     body('name').notEmpty().withMessage('이름을 입력하세요'),
     body('position').notEmpty().withMessage('직급을 선택하세요'),
     body('division').notEmpty().withMessage('본부를 선택하세요'),
     body('office').notEmpty().withMessage('처를 선택하세요'),
-    body('department').notEmpty().withMessage('부서를 선택하세요')
+    body('department').optional({ values: 'falsy' })
   ],
   async (req, res, next) => {
     try {
@@ -87,23 +89,26 @@ router.post('/register',
 
       const office_id = officeResult.rows[0].id;
 
-      // 3. department_id 찾기 (office_id로 필터링)
-      const departmentResult = await query(
-        'SELECT id FROM departments WHERE name = $1 AND office_id = $2',
-        [department, office_id]
-      );
+      // 3. department_id 찾기 (office_id로 필터링, 부서가 없는 처/지사는 null)
+      let department_id = null;
+      if (department) {
+        const departmentResult = await query(
+          'SELECT id FROM departments WHERE name = $1 AND office_id = $2',
+          [department, office_id]
+        );
 
-      if (departmentResult.rows.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'INVALID_DEPARTMENT',
-            message: '유효하지 않은 부서입니다.'
-          }
-        });
+        if (departmentResult.rows.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: 'INVALID_DEPARTMENT',
+              message: '유효하지 않은 부서입니다.'
+            }
+          });
+        }
+
+        department_id = departmentResult.rows[0].id;
       }
-
-      const department_id = departmentResult.rows[0].id;
 
       // 비밀번호 해싱
       const hashedPassword = await bcrypt.hash(password, 10);

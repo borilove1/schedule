@@ -18,7 +18,7 @@ services:
     networks:
       - schedule-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +49,7 @@ services:
     networks:
       - schedule-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health',(r)=>{process.exit(r.statusCode===200?0:1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -57,7 +57,7 @@ services:
   # 프론트엔드 + Nginx
   frontend:
     build:
-      context: ./frontend
+      context: ./schedule-frontend
       dockerfile: Dockerfile
     container_name: schedule-frontend
     restart: always

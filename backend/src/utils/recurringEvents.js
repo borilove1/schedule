@@ -35,23 +35,27 @@ function generateOccurrencesFromSeries(series, startDate, endDate, exceptions = 
     );
 
     if (!isException) {
-      // start_time과 end_time을 사용하여 timestamp 생성
-      const [startHour, startMin, startSec] = series.start_time.split(':');
-      const [endHour, endMin, endSec] = series.end_time.split(':');
+      // 타임존 없는 로컬 시간 문자열로 생성하여 프론트엔드에서 정확한 시간 표시
+      const startAtStr = `${occurrenceDateStr}T${series.start_time}`;
 
-      const startAt = new Date(currentDate);
-      startAt.setHours(parseInt(startHour), parseInt(startMin), parseInt(startSec || 0));
-
-      const endAt = new Date(currentDate);
-      endAt.setHours(parseInt(endHour), parseInt(endMin), parseInt(endSec || 0));
+      // 다일 일정: duration_days만큼 종료 날짜를 offset
+      const durationDays = series.duration_days || 0;
+      let endDateStr = occurrenceDateStr;
+      if (durationDays > 0) {
+        const endDate = new Date(currentDate);
+        endDate.setDate(endDate.getDate() + durationDays);
+        endDateStr = endDate.toISOString().split('T')[0];
+      }
+      const endAtStr = `${endDateStr}T${series.end_time}`;
 
       occurrences.push({
         id: `series-${series.id}-${currentDate.getTime()}`, // 임시 ID
         title: series.title,
         content: series.content,
-        start_at: startAt.toISOString(),
-        end_at: endAt.toISOString(),
-        status: 'PENDING',
+        start_at: startAtStr,
+        end_at: endAtStr,
+        status: series.status || 'PENDING',
+        completed_at: series.completed_at || null,
         alert: series.alert,
         series_id: series.id,
         occurrence_date: occurrenceDateStr,

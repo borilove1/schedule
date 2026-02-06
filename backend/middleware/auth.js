@@ -113,6 +113,7 @@ const authenticate = async (req, res, next) => {
 
 // 권한 체크 미들웨어
 const authorize = (...roles) => {
+  const flatRoles = roles.flat();
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -124,7 +125,7 @@ const authorize = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!flatRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         error: {

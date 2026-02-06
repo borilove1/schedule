@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, ArrowLeft } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Calendar, ArrowLeft, Sun, Moon } from 'lucide-react';
 import api from '../../utils/api';
 
 export default function SignupPage({ onBackClick }) {
   const { register } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    passwordConfirm: '',
     name: '',
     position: '',
     division: '',
@@ -23,24 +26,55 @@ export default function SignupPage({ onBackClick }) {
   });
   const [loadingOrgs, setLoadingOrgs] = useState(true);
 
+  const bgColor = isDarkMode ? '#0f172a' : '#f8fafc';
+  const cardBg = isDarkMode ? '#283548' : '#ffffff';
+  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
+  const secondaryTextColor = isDarkMode ? '#94a3b8' : '#64748b';
+  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
+  const inputBg = isDarkMode ? '#1e293b' : '#f8fafc';
+
   // 조직 구조 로드
   useEffect(() => {
     const loadOrganizations = async () => {
       try {
         const data = await api.request('/organizations/structure');
         setOrganizations(data.organization || {
-          divisions: ['기술본부', '경영본부'],
-          offices: { '기술본부': ['IT처', '기획관리실'], '경영본부': ['재무처', '인사처'] },
-          departments: { 'IT처': ['개발1부서', '개발2부서'], '기획관리실': ['기획부서'], '재무처': ['재무부서'], '인사처': ['인사부서'] }
+          divisions: ['부산울산본부'],
+          offices: {
+            '부산울산본부': [
+              '기획관리실', '전력사업처', '전력관리처', '안전재난부',
+              '울산지사', '김해지사', '동래지사', '남부산지사', '양산지사',
+              '중부산지사', '북부산지사', '동울산지사', '서부산지사', '기장지사',
+              '서울산지사', '영도지사', '울산전력지사', '북부산전력지사',
+              '동부산전력지사', '서부산전력지사'
+            ]
+          },
+          departments: {
+            '기획관리실': ['전략경영부', '경영지원부', '재무자재부', 'AI혁신부'],
+            '전력사업처': ['고객지원부', '전력공급부', '요금관리부', '배전운영부', '에너지효율부', '배전건설부', 'ICT운영부'],
+            '전력관리처': ['송변전안전팀', '지역협력부', '계통운영부', '송전운영부', '변전운영부', '설비보강부', '전자제어부', '토건운영부']
+          }
         });
         setLoadingOrgs(false);
       } catch (error) {
         console.error('Failed to load organizations:', error);
         // 기본값 사용
         setOrganizations({
-          divisions: ['기술본부', '경영본부'],
-          offices: { '기술본부': ['IT처', '기획관리실'], '경영본부': ['재무처', '인사처'] },
-          departments: { 'IT처': ['개발1부서', '개발2부서'], '기획관리실': ['기획부서'], '재무처': ['재무부서'], '인사처': ['인사부서'] }
+          divisions: ['부산울산본부'],
+          offices: {
+            '부산울산본부': [
+              '기획관리실', '전력사업처', '전력관리처', '안전재난부',
+              '울산지사', '김해지사', '동래지사', '남부산지사', '양산지사',
+              '중부산지사', '북부산지사', '동울산지사', '서부산지사', '기장지사',
+              '서울산지사', '영도지사', '울산전력지사', '북부산전력지사',
+              '동부산전력지사', '서부산전력지사'
+            ]
+          },
+          departments: {
+            '기획관리실': ['전략경영부', '경영지원부', '재무자재부', 'AI혁신부'],
+            '전력사업처': ['고객지원부', '전력공급부', '요금관리부', '배전운영부', '에너지효율부', '배전건설부', 'ICT운영부'],
+            '전력관리처': ['송변전안전팀', '지역협력부', '계통운영부', '송전운영부', '변전운영부', '설비보강부', '전자제어부', '토건운영부']
+          }
         });
         setLoadingOrgs(false);
       }
@@ -50,7 +84,7 @@ export default function SignupPage({ onBackClick }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     // 본부 변경 시 처와 부서 초기화
     if (name === 'division') {
       setFormData({
@@ -78,17 +112,34 @@ export default function SignupPage({ onBackClick }) {
 
   // 선택 가능한 처 목록
   const availableOffices = formData.division ? (organizations.offices[formData.division] || []) : [];
-  
+
   // 선택 가능한 부서 목록
   const availableDepartments = formData.office ? (organizations.departments[formData.office] || []) : [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (formData.password !== formData.passwordConfirm) {
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('비밀번호는 최소 8자 이상이어야 합니다.');
+      return;
+    }
+
+    if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(formData.password)) {
+      setError('비밀번호는 영문과 숫자를 모두 포함해야 합니다.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await register(formData);
+      const { passwordConfirm, ...submitData } = formData;
+      await register(submitData);
     } catch (err) {
       setError(err.message || '회원가입에 실패했습니다.');
     } finally {
@@ -100,9 +151,9 @@ export default function SignupPage({ onBackClick }) {
     width: '100%',
     padding: '12px',
     borderRadius: '8px',
-    border: '1px solid #334155',
-    backgroundColor: '#0f172a',
-    color: '#e2e8f0',
+    border: `1px solid ${borderColor}`,
+    backgroundColor: inputBg,
+    color: textColor,
     fontSize: '14px',
     outline: 'none',
     boxSizing: 'border-box'
@@ -112,47 +163,71 @@ export default function SignupPage({ onBackClick }) {
     display: 'block',
     fontSize: '14px',
     fontWeight: '500',
-    color: '#e2e8f0',
+    color: textColor,
     marginBottom: '8px'
   };
 
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#0f172a',
+      backgroundColor: bgColor,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '20px',
+      transition: 'background-color 0.2s'
     }}>
       <div style={{
         width: '100%',
         maxWidth: '500px',
-        backgroundColor: '#1e293b',
+        backgroundColor: cardBg,
         borderRadius: '16px',
         padding: '40px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+        boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.3)' : '0 10px 40px rgba(0,0,0,0.08)',
+        transition: 'background-color 0.2s, box-shadow 0.2s'
       }}>
-        <button
-          onClick={onBackClick}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '24px',
-            padding: '4px'
-          }}
-        >
-          <ArrowLeft size={20} /> 로그인으로 돌아가기
-        </button>
+        {/* 상단: 뒤로가기 + 다크모드 토글 */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '24px'
+        }}>
+          <button
+            onClick={onBackClick}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: secondaryTextColor,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '4px'
+            }}
+          >
+            <ArrowLeft size={20} /> 로그인으로 돌아가기
+          </button>
+          <button
+            onClick={toggleDarkMode}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: secondaryTextColor,
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+            title={isDarkMode ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          >
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+        </div>
 
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <Calendar size={48} color="#3B82F6" style={{ margin: '0 auto 16px' }} />
-          <h1 style={{ fontSize: '24px', fontWeight: '600', color: '#e2e8f0', margin: 0 }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '600', color: textColor, margin: 0 }}>
             회원가입
           </h1>
         </div>
@@ -186,6 +261,8 @@ export default function SignupPage({ onBackClick }) {
                 <option value="과장">과장</option>
                 <option value="차장">차장</option>
                 <option value="부장">부장</option>
+                <option value="처장">처장</option>
+                <option value="본부장">본부장</option>
               </select>
             </div>
           </div>
@@ -211,10 +288,33 @@ export default function SignupPage({ onBackClick }) {
               value={formData.password}
               onChange={handleChange}
               required
-              minLength={6}
+              minLength={8}
               style={inputStyle}
-              placeholder="최소 6자 이상"
+              placeholder="영문, 숫자 포함 8자 이상"
             />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>비밀번호 확인 *</label>
+            <input
+              type="password"
+              name="passwordConfirm"
+              value={formData.passwordConfirm}
+              onChange={handleChange}
+              required
+              minLength={8}
+              style={{
+                ...inputStyle,
+                borderColor: formData.passwordConfirm && formData.password !== formData.passwordConfirm
+                  ? '#ef4444' : borderColor
+              }}
+              placeholder="비밀번호를 다시 입력하세요"
+            />
+            {formData.passwordConfirm && formData.password !== formData.passwordConfirm && (
+              <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+                비밀번호가 일치하지 않습니다.
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: '20px' }}>
@@ -228,9 +328,10 @@ export default function SignupPage({ onBackClick }) {
               style={inputStyle}
             >
               <option value="">선택하세요</option>
-              {organizations.divisions.map(division => (
-                <option key={division} value={division}>{division}</option>
-              ))}
+              {organizations.divisions.map(division => {
+                const name = typeof division === 'string' ? division : division.name;
+                return <option key={name} value={name}>{name}</option>;
+              })}
             </select>
           </div>
 
@@ -245,34 +346,36 @@ export default function SignupPage({ onBackClick }) {
               style={inputStyle}
             >
               <option value="">선택하세요</option>
-              {availableOffices.map(office => (
-                <option key={office} value={office}>{office}</option>
-              ))}
+              {availableOffices.map(office => {
+                const name = typeof office === 'string' ? office : office.name;
+                return <option key={name} value={name}>{name}</option>;
+              })}
             </select>
             {!formData.division && (
-              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', color: secondaryTextColor, marginTop: '4px' }}>
                 먼저 본부를 선택하세요
               </div>
             )}
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={labelStyle}>부서 *</label>
+            <label style={labelStyle}>부서{availableDepartments.length > 0 ? ' *' : ''}</label>
             <select
               name="department"
               value={formData.department}
               onChange={handleChange}
-              required
-              disabled={!formData.office || loadingOrgs}
+              required={availableDepartments.length > 0}
+              disabled={!formData.office || loadingOrgs || availableDepartments.length === 0}
               style={inputStyle}
             >
-              <option value="">선택하세요</option>
-              {availableDepartments.map(department => (
-                <option key={department} value={department}>{department}</option>
-              ))}
+              <option value="">{availableDepartments.length > 0 ? '선택하세요' : '해당 없음'}</option>
+              {availableDepartments.map(department => {
+                const name = typeof department === 'string' ? department : department.name;
+                return <option key={name} value={name}>{name}</option>;
+              })}
             </select>
             {!formData.office && (
-              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', color: secondaryTextColor, marginTop: '4px' }}>
                 먼저 처를 선택하세요
               </div>
             )}
@@ -282,8 +385,8 @@ export default function SignupPage({ onBackClick }) {
             <div style={{
               padding: '12px',
               borderRadius: '8px',
-              backgroundColor: '#7f1d1d',
-              color: '#fca5a5',
+              backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
+              color: isDarkMode ? '#fca5a5' : '#dc2626',
               fontSize: '14px',
               marginBottom: '20px'
             }}>

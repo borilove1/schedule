@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import api from '../../utils/api';
 
 const getInitialFormData = (selectedDate) => {
@@ -31,11 +32,12 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const darkMode = true;
-  const bgColor = darkMode ? '#0f172a' : '#f1f5f9';
-  const cardBg = darkMode ? '#1e293b' : '#fff';
-  const textColor = darkMode ? '#e2e8f0' : '#1e293b';
-  const borderColor = darkMode ? '#334155' : '#e2e8f0';
+  const { isDarkMode } = useTheme();
+  const bgColor = isDarkMode ? '#1e293b' : '#f8fafc';
+  const cardBg = isDarkMode ? '#283548' : '#ffffff';
+  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
+  const secondaryTextColor = isDarkMode ? '#94a3b8' : '#64748b';
+  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
 
   // 모달이 열릴 때마다 폼 초기화
   useEffect(() => {
@@ -64,6 +66,12 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
       // 날짜/시간 합치기
       const startAt = `${formData.startDate}T${formData.startTime}:00`;
       const endAt = `${formData.endDate}T${formData.endTime}:00`;
+
+      if (new Date(endAt) <= new Date(startAt)) {
+        setError('종료 시간은 시작 시간보다 이후여야 합니다.');
+        setLoading(false);
+        return;
+      }
 
       const eventData = {
         title: formData.title,
@@ -359,7 +367,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
                 <p style={{
                   marginTop: '8px',
                   fontSize: '13px',
-                  color: '#94a3b8',
+                  color: secondaryTextColor,
                   fontFamily
                 }}>
                   {formData.recurrenceInterval === '1' || formData.recurrenceInterval === 1
@@ -383,7 +391,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
                 <p style={{
                   marginTop: '8px',
                   fontSize: '13px',
-                  color: '#94a3b8',
+                  color: secondaryTextColor,
                   fontFamily
                 }}>
                   이 날짜까지 반복됩니다
@@ -397,8 +405,8 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
             <div style={{
               padding: '12px',
               borderRadius: '8px',
-              backgroundColor: '#7f1d1d',
-              color: '#fca5a5',
+              backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
+              color: isDarkMode ? '#fca5a5' : '#dc2626',
               fontSize: '14px',
               marginBottom: '20px'
             }}>

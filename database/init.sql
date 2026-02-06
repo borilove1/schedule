@@ -88,7 +88,8 @@ CREATE TABLE users (
     
     -- 제약 조건
     CONSTRAINT check_admin_scope CHECK (
-        (role IN ('DEPT_LEAD', 'ADMIN') AND scope IS NOT NULL) OR
+        (role = 'DEPT_LEAD' AND scope IS NOT NULL) OR
+        (role = 'ADMIN') OR
         (role = 'USER' AND scope IS NULL)
     )
 );
@@ -120,9 +121,13 @@ CREATE TABLE event_series (
     end_time TIME NOT NULL, -- 종료 시간
     first_occurrence_date DATE NOT NULL, -- 첫 발생일
     
+    -- 상태
+    status event_status NOT NULL DEFAULT 'PENDING',
+    completed_at TIMESTAMP WITH TIME ZONE,
+
     -- 알림
     alert alert_time DEFAULT 'none',
-    
+
     -- 작성자 및 조직 정보
     creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
@@ -308,34 +313,60 @@ CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON comments
 -- ========================================
 
 -- 본부
-INSERT INTO divisions (name) VALUES ('기술본부'), ('경영본부');
+INSERT INTO divisions (name) VALUES ('부산울산본부');
 
--- 처/실
-INSERT INTO offices (name, division_id) VALUES 
-    ('IT처', 1),
+-- 처/실/지사
+INSERT INTO offices (name, division_id) VALUES
     ('기획관리실', 1),
-    ('재무처', 2),
-    ('인사처', 2);
+    ('전력사업처', 1),
+    ('전력관리처', 1),
+    ('안전재난부', 1),
+    ('울산지사', 1),
+    ('김해지사', 1),
+    ('동래지사', 1),
+    ('남부산지사', 1),
+    ('양산지사', 1),
+    ('중부산지사', 1),
+    ('북부산지사', 1),
+    ('동울산지사', 1),
+    ('서부산지사', 1),
+    ('기장지사', 1),
+    ('서울산지사', 1),
+    ('영도지사', 1),
+    ('울산전력지사', 1),
+    ('북부산전력지사', 1),
+    ('동부산전력지사', 1),
+    ('서부산전력지사', 1);
 
--- 부서
-INSERT INTO departments (name, office_id) VALUES 
-    ('개발1부서', 1),
-    ('개발2부서', 1),
-    ('인프라부서', 1),
-    ('기획부서', 2),
-    ('전략부서', 2),
-    ('재무부서', 3),
-    ('회계부서', 3),
-    ('인사부서', 4),
-    ('채용부서', 4);
+-- 부서 (기획관리실 산하)
+INSERT INTO departments (name, office_id) VALUES
+    ('전략경영부', 1),
+    ('경영지원부', 1),
+    ('재무자재부', 1),
+    ('AI혁신부', 1);
 
--- 사용자 (비밀번호는 bcrypt로 해시해야 함, 여기서는 임시로 평문)
--- 실제 운영 시에는 bcrypt.hash() 사용
-INSERT INTO users (email, password_hash, name, position, department_id, office_id, division_id, role, scope) VALUES 
-    ('admin@company.com', '$2b$10$placeholder', '시스템관리자', '관리자', NULL, NULL, NULL, 'ADMIN', NULL),
-    ('park@company.com', '$2b$10$placeholder', '박사원', '사원', 1, 1, 1, 'USER', NULL),
-    ('kim@company.com', '$2b$10$placeholder', '김부장', '부장', 1, 1, 1, 'DEPT_LEAD', 'DEPARTMENT'),
-    ('yoon@company.com', '$2b$10$placeholder', '윤본부장', '본부장', NULL, NULL, 1, 'DEPT_LEAD', 'DIVISION');
+-- 부서 (전력사업처 산하)
+INSERT INTO departments (name, office_id) VALUES
+    ('고객지원부', 2),
+    ('전력공급부', 2),
+    ('요금관리부', 2),
+    ('배전운영부', 2),
+    ('에너지효율부', 2),
+    ('배전건설부', 2),
+    ('ICT운영부', 2);
+
+-- 부서 (전력관리처 산하)
+INSERT INTO departments (name, office_id) VALUES
+    ('송변전안전팀', 3),
+    ('지역협력부', 3),
+    ('계통운영부', 3),
+    ('송전운영부', 3),
+    ('변전운영부', 3),
+    ('설비보강부', 3),
+    ('전자제어부', 3),
+    ('토건운영부', 3);
+
+-- 안전재난부, 각 지사는 하위 부서 없음
 
 -- ========================================
 -- 9. 유용한 뷰 (View)

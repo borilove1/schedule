@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Calendar, Sun, Moon } from 'lucide-react';
 
 export default function LoginPage({ onSignupClick }) {
   const { login } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const bgColor = isDarkMode ? '#0f172a' : '#f8fafc';
+  const cardBg = isDarkMode ? '#283548' : '#ffffff';
+  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
+  const secondaryTextColor = isDarkMode ? '#94a3b8' : '#64748b';
+  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
+  const inputBg = isDarkMode ? '#1e293b' : '#f8fafc';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,26 +35,47 @@ export default function LoginPage({ onSignupClick }) {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#0f172a',
+      backgroundColor: bgColor,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '20px',
+      transition: 'background-color 0.2s'
     }}>
       <div style={{
         width: '100%',
         maxWidth: '400px',
-        backgroundColor: '#1e293b',
+        backgroundColor: cardBg,
         borderRadius: '16px',
         padding: '40px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+        boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.3)' : '0 10px 40px rgba(0,0,0,0.08)',
+        transition: 'background-color 0.2s, box-shadow 0.2s'
       }}>
+        {/* 다크모드 토글 */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <button
+            onClick={toggleDarkMode}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: secondaryTextColor,
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+            title={isDarkMode ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          >
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+        </div>
+
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <Calendar size={48} color="#3B82F6" style={{ margin: '0 auto 16px' }} />
-          <h1 style={{ fontSize: '24px', fontWeight: '600', color: '#e2e8f0', margin: 0 }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '600', color: textColor, margin: 0 }}>
             업무일정 관리
           </h1>
-          <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '8px' }}>
+          <p style={{ fontSize: '14px', color: secondaryTextColor, marginTop: '8px' }}>
             로그인하여 시작하세요
           </p>
         </div>
@@ -56,7 +86,7 @@ export default function LoginPage({ onSignupClick }) {
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#e2e8f0',
+              color: textColor,
               marginBottom: '8px'
             }}>
               이메일
@@ -70,9 +100,9 @@ export default function LoginPage({ onSignupClick }) {
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                border: '1px solid #334155',
-                backgroundColor: '#0f172a',
-                color: '#e2e8f0',
+                border: `1px solid ${borderColor}`,
+                backgroundColor: inputBg,
+                color: textColor,
                 fontSize: '14px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -86,7 +116,7 @@ export default function LoginPage({ onSignupClick }) {
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#e2e8f0',
+              color: textColor,
               marginBottom: '8px'
             }}>
               비밀번호
@@ -100,9 +130,9 @@ export default function LoginPage({ onSignupClick }) {
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                border: '1px solid #334155',
-                backgroundColor: '#0f172a',
-                color: '#e2e8f0',
+                border: `1px solid ${borderColor}`,
+                backgroundColor: inputBg,
+                color: textColor,
                 fontSize: '14px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -115,8 +145,8 @@ export default function LoginPage({ onSignupClick }) {
             <div style={{
               padding: '12px',
               borderRadius: '8px',
-              backgroundColor: '#7f1d1d',
-              color: '#fca5a5',
+              backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
+              color: isDarkMode ? '#fca5a5' : '#dc2626',
               fontSize: '14px',
               marginBottom: '20px'
             }}>
@@ -148,7 +178,7 @@ export default function LoginPage({ onSignupClick }) {
           marginTop: '24px',
           textAlign: 'center',
           fontSize: '14px',
-          color: '#94a3b8'
+          color: secondaryTextColor
         }}>
           계정이 없으신가요?{' '}
           <button

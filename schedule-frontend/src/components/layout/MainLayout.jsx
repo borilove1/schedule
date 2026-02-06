@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Calendar, Sun, Moon, LogOut, Menu, X, Shield } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 
-export default function MainLayout({ children }) {
+export default function MainLayout({ children, currentPage, onNavigate }) {
   const { user, logout } = useAuth();
-  const [darkMode, setDarkMode] = useState(true);
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isMobile] = useState(window.innerWidth <= 768);
 
-  const bgColor = darkMode ? '#0f172a' : '#f1f5f9';
-  const cardBg = darkMode ? '#1e293b' : '#fff';
-  const textColor = darkMode ? '#e2e8f0' : '#1e293b';
-  const borderColor = darkMode ? '#334155' : '#e2e8f0';
+  const bgColor = isDarkMode ? '#0f172a' : '#f8fafc';
+  const cardBg = isDarkMode ? '#283548' : '#ffffff';
+  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
+  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: bgColor, color: textColor }}>
@@ -55,14 +56,14 @@ export default function MainLayout({ children }) {
               <div style={{ fontSize: '14px', fontWeight: '500' }}>
                 {user.division} {user.office}
               </div>
-              <div style={{ fontSize: '13px', color: darkMode ? '#94a3b8' : '#64748b' }}>
+              <div style={{ fontSize: '13px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
                 {user.department} {user.position} {user.name}님
               </div>
             </div>
           )}
           
           <button
-            onClick={() => setDarkMode(!darkMode)}
+            onClick={toggleDarkMode}
             style={{
               background: 'none',
               border: 'none',
@@ -73,10 +74,28 @@ export default function MainLayout({ children }) {
               alignItems: 'center'
             }}
           >
-            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
 
-          <NotificationBell darkMode={darkMode} textColor={textColor} />
+          <NotificationBell darkMode={isDarkMode} textColor={textColor} />
+
+          {user && user.role === 'ADMIN' && (
+            <button
+              onClick={() => onNavigate(currentPage === 'admin' ? 'calendar' : 'admin')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: currentPage === 'admin' ? '#3B82F6' : textColor,
+                cursor: 'pointer',
+                padding: '8px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              title={currentPage === 'admin' ? '캘린더로 돌아가기' : '관리자 페이지'}
+            >
+              <Shield size={20} />
+            </button>
+          )}
 
           <button
             onClick={logout}
@@ -107,7 +126,7 @@ export default function MainLayout({ children }) {
           <div style={{ fontWeight: '500' }}>
             {user.division} {user.office}
           </div>
-          <div style={{ color: darkMode ? '#94a3b8' : '#64748b' }}>
+          <div style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
             {user.department} {user.position} {user.name}님
           </div>
         </div>

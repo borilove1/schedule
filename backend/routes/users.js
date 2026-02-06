@@ -168,6 +168,43 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// ========== 사용자 활성화/비활성화 토글 ==========
+router.patch('/:id/toggle-active', authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // 본인 비활성화 방지
+    if (req.user.id === parseInt(id)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'USER_004',
+          message: '본인 계정은 비활성화할 수 없습니다.'
+        }
+      });
+    }
+
+    const result = await query(
+      'UPDATE users SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1 RETURNING id, is_active',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_001', message: '사용자를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0]
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ========== 사용자 수정 ==========
 router.put('/:id', authorize('ADMIN'), async (req, res, next) => {
   try {
@@ -186,38 +223,53 @@ router.put('/:id', authorize('ADMIN'), async (req, res, next) => {
       });
     }
 
-    // 직급에 따른 권한 설정
-    let role = 'USER';
-    let scope = null;
+    // 명시적 role/scope가 전달되면 해당 값 사용, 아니면 직급 기반 자동 파생
+    let role = req.body.role;
+    let scope = req.body.scope;
 
-    if (position === '부장') {
-      role = 'DEPT_LEAD';
-      scope = 'DEPARTMENT';
-    } else if (position === '실장' || position === '처장') {
-      role = 'DEPT_LEAD';
-      scope = 'OFFICE';
-    } else if (position === '본부장') {
-      role = 'DEPT_LEAD';
-      scope = 'DIVISION';
-    } else if (position === '관리자') {
-      role = 'ADMIN';
+    if (!role) {
+      role = 'USER';
       scope = null;
+
+      if (position === '부장') {
+        role = 'DEPT_LEAD';
+        scope = 'DEPARTMENT';
+      } else if (position === '실장' || position === '처장') {
+        role = 'DEPT_LEAD';
+        scope = 'OFFICE';
+      } else if (position === '본부장') {
+        role = 'DEPT_LEAD';
+        scope = 'DIVISION';
+      } else if (position === '관리자') {
+        role = 'ADMIN';
+        scope = null;
+      }
+    } else {
+      // role이 명시적으로 전달된 경우 scope 검증
+      if (role === 'USER') {
+        scope = null;
+      } else if (role === 'ADMIN') {
+        scope = scope || null;
+      } else if (role === 'DEPT_LEAD' && !scope) {
+        scope = 'DEPARTMENT'; // 기본 scope
+      }
     }
 
     // 사용자 정보 업데이트
     const result = await query(`
       UPDATE users
-      SET 
+      SET
         name = $1,
         position = $2,
         department_id = $3,
         office_id = $4,
         division_id = $5,
         role = $6,
-        scope = $7
+        scope = $7,
+        updated_at = NOW()
       WHERE id = $8
       RETURNING id, email, name, position, role, scope
-    `, [name, position, departmentId || null, officeId || null, divisionId || null, role, scope, id]);
+    `, [name, position, departmentId || null, officeId || null, divisionId || null, role, scope || null, id]);
 
     res.json({
       success: true,

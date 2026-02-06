@@ -35,7 +35,7 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || '요청 실패');
+        throw new Error(data.error?.message || data.message || '요청 실패');
       }
 
       // { success: true, data: {...} } 형태면 data만 반환
@@ -108,15 +108,123 @@ class ApiClient {
     });
   }
 
-  async completeEvent(id) {
+  async completeEvent(id, options = {}) {
     return this.request(`/events/${id}/complete`, {
       method: 'POST',
+      body: JSON.stringify(options),
     });
   }
 
   async uncompleteEvent(id) {
     return this.request(`/events/${id}/uncomplete`, {
       method: 'POST',
+    });
+  }
+
+  // ========== 사용자 관리 (Admin) ==========
+  async getUsers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/users${query ? `?${query}` : ''}`);
+  }
+
+  async getUserDetail(id) {
+    return this.request(`/users/${id}`);
+  }
+
+  async updateUser(id, userData) {
+    return this.request(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async toggleUserActive(id) {
+    return this.request(`/users/${id}/toggle-active`, {
+      method: 'PATCH',
+    });
+  }
+
+  async deleteUser(id) {
+    return this.request(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ========== 조직 관리 (Admin) ==========
+  async getOffices(divisionId) {
+    const query = divisionId ? `?divisionId=${divisionId}` : '';
+    return this.request(`/organizations/offices${query}`);
+  }
+
+  async createDivision(name) {
+    return this.request('/organizations/divisions', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async updateDivision(id, name) {
+    return this.request(`/organizations/divisions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async deleteDivision(id) {
+    return this.request(`/organizations/divisions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async createOffice(name, divisionId) {
+    return this.request('/organizations/offices', {
+      method: 'POST',
+      body: JSON.stringify({ name, divisionId }),
+    });
+  }
+
+  async updateOffice(id, data) {
+    return this.request(`/organizations/offices/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteOffice(id) {
+    return this.request(`/organizations/offices/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async createDepartment(name, officeId) {
+    return this.request('/organizations/departments', {
+      method: 'POST',
+      body: JSON.stringify({ name, officeId }),
+    });
+  }
+
+  async updateDepartment(id, data) {
+    return this.request(`/organizations/departments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteDepartment(id) {
+    return this.request(`/organizations/departments/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ========== 시스템 설정 (Admin) ==========
+  async getSettings() {
+    return this.request('/settings');
+  }
+
+  async updateSettings(settings) {
+    return this.request('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
     });
   }
 

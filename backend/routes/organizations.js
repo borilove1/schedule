@@ -19,9 +19,9 @@ router.get('/structure', async (req, res, next) => {
     const departmentsResult = await query('SELECT id, name, office_id FROM departments ORDER BY id');
     const departments = departmentsResult.rows;
 
-    // 4. 구조화된 데이터 생성
+    // 4. 구조화된 데이터 생성 (ID 포함)
     const structure = {
-      divisions: divisions.map(d => d.name),
+      divisions: divisions.map(d => ({ id: d.id, name: d.name })),
       offices: {},
       departments: {}
     };
@@ -30,7 +30,7 @@ router.get('/structure', async (req, res, next) => {
     divisions.forEach(division => {
       const divisionOffices = offices
         .filter(o => o.division_id === division.id)
-        .map(o => o.name);
+        .map(o => ({ id: o.id, name: o.name }));
       structure.offices[division.name] = divisionOffices;
     });
 
@@ -38,7 +38,7 @@ router.get('/structure', async (req, res, next) => {
     offices.forEach(office => {
       const officeDepartments = departments
         .filter(d => d.office_id === office.id)
-        .map(d => d.name);
+        .map(d => ({ id: d.id, name: d.name }));
       structure.departments[office.name] = officeDepartments;
     });
 
@@ -234,6 +234,234 @@ router.post('/departments', authenticate, authorize(['ADMIN']), async (req, res,
         }
       });
     }
+    next(error);
+  }
+});
+
+// ========== 본부 수정 (Admin) ==========
+router.put('/divisions/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: '본부 이름을 입력하세요.' }
+      });
+    }
+
+    const result = await query(
+      'UPDATE divisions SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [name, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '본부를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({ success: true, division: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'DUPLICATE_NAME', message: '이미 존재하는 본부 이름입니다.' }
+      });
+    }
+    next(error);
+  }
+});
+
+// ========== 본부 삭제 (Admin) ==========
+router.delete('/divisions/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // 소속 사용자 확인
+    const usersCheck = await query('SELECT COUNT(*) as count FROM users WHERE division_id = $1', [id]);
+    if (parseInt(usersCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'HAS_USERS',
+          message: `${usersCheck.rows[0].count}명의 사용자가 이 본부에 소속되어 있습니다. 먼저 사용자를 다른 본부로 이동하세요.`
+        }
+      });
+    }
+
+    const result = await query('DELETE FROM divisions WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '본부를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({ success: true, data: { message: '본부가 삭제되었습니다.' } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 처 수정 (Admin) ==========
+router.put('/offices/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, divisionId } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: '처 이름을 입력하세요.' }
+      });
+    }
+
+    const updateFields = ['name = $1', 'updated_at = NOW()'];
+    const params = [name];
+    let paramCount = 1;
+
+    if (divisionId) {
+      paramCount++;
+      updateFields.push(`division_id = $${paramCount}`);
+      params.push(divisionId);
+    }
+
+    paramCount++;
+    params.push(id);
+
+    const result = await query(
+      `UPDATE offices SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '처를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({ success: true, office: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'DUPLICATE_NAME', message: '이미 존재하는 처 이름입니다.' }
+      });
+    }
+    next(error);
+  }
+});
+
+// ========== 처 삭제 (Admin) ==========
+router.delete('/offices/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const usersCheck = await query('SELECT COUNT(*) as count FROM users WHERE office_id = $1', [id]);
+    if (parseInt(usersCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'HAS_USERS',
+          message: `${usersCheck.rows[0].count}명의 사용자가 이 처에 소속되어 있습니다. 먼저 사용자를 다른 처로 이동하세요.`
+        }
+      });
+    }
+
+    const result = await query('DELETE FROM offices WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '처를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({ success: true, data: { message: '처가 삭제되었습니다.' } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 부서 수정 (Admin) ==========
+router.put('/departments/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, officeId } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: '부서 이름을 입력하세요.' }
+      });
+    }
+
+    const updateFields = ['name = $1', 'updated_at = NOW()'];
+    const params = [name];
+    let paramCount = 1;
+
+    if (officeId) {
+      paramCount++;
+      updateFields.push(`office_id = $${paramCount}`);
+      params.push(officeId);
+    }
+
+    paramCount++;
+    params.push(id);
+
+    const result = await query(
+      `UPDATE departments SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '부서를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({ success: true, department: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'DUPLICATE_NAME', message: '이미 존재하는 부서 이름입니다.' }
+      });
+    }
+    next(error);
+  }
+});
+
+// ========== 부서 삭제 (Admin) ==========
+router.delete('/departments/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const usersCheck = await query('SELECT COUNT(*) as count FROM users WHERE department_id = $1', [id]);
+    if (parseInt(usersCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'HAS_USERS',
+          message: `${usersCheck.rows[0].count}명의 사용자가 이 부서에 소속되어 있습니다. 먼저 사용자를 다른 부서로 이동하세요.`
+        }
+      });
+    }
+
+    const result = await query('DELETE FROM departments WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '부서를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({ success: true, data: { message: '부서가 삭제되었습니다.' } });
+  } catch (error) {
     next(error);
   }
 });

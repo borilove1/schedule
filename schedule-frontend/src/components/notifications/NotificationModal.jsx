@@ -15,13 +15,13 @@ export default function NotificationModal({
   const actionInProgressRef = useRef(false);
 
   // Color scheme
-  const bgColor = darkMode ? '#0f172a' : '#f1f5f9';
-  const cardBg = darkMode ? '#1e293b' : '#fff';
+  const bgColor = darkMode ? '#0f172a' : '#f8fafc';
+  const cardBg = darkMode ? '#283548' : '#ffffff';
   const textColor = darkMode ? '#e2e8f0' : '#1e293b';
   const secondaryTextColor = darkMode ? '#94a3b8' : '#64748b';
-  const borderColor = darkMode ? '#334155' : '#e2e8f0';
-  const unreadBg = darkMode ? '#1e3a5f' : '#eff6ff';
-  const hoverBg = darkMode ? '#334155' : '#f8fafc';
+  const borderColor = darkMode ? '#475569' : '#cbd5e1';
+  const unreadBg = darkMode ? '#1e3a5f' : '#dbeafe';
+  const hoverBg = darkMode ? '#3d4f66' : '#f1f5f9';
 
   // Load notifications
   const loadNotifications = async () => {
