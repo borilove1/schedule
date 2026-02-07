@@ -29,7 +29,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
   const [formData, setFormData] = useState({
     title: '', content: '',
     startDate: '', startTime: '', endDate: '', endTime: '',
-    recurrenceType: 'week', recurrenceInterval: 1, recurrenceEndDate: ''
+    isRecurring: false, recurrenceType: 'week', recurrenceInterval: 1, recurrenceEndDate: ''
   });
 
   useEffect(() => {
@@ -67,6 +67,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
           title: data.title || '', content: data.content || '',
           startDate: start.date, startTime: start.time,
           endDate: end.date, endTime: end.time,
+          isRecurring: !!(data.isRecurring || data.seriesId),
           recurrenceType: data.recurrenceType || 'week',
           recurrenceInterval: data.recurrenceInterval || 1,
           recurrenceEndDate: data.recurrenceEndDate
@@ -116,18 +117,18 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
             updateData.recurrenceEndDate = formData.recurrenceEndDate || null;
           }
         }
+        // 단일 일정 → 반복 일정 변환
+        if (formData.isRecurring && !event.seriesId && !String(eventId).startsWith('series-')) {
+          updateData.isRecurring = true;
+          updateData.recurrenceType = formData.recurrenceType;
+          updateData.recurrenceInterval = parseInt(formData.recurrenceInterval, 10);
+          updateData.recurrenceEndDate = formData.recurrenceEndDate || null;
+        }
 
         await api.updateEvent(eventId, updateData);
-        setIsEditing(false);
         onSuccess();
-
-        if (eventId && String(eventId).startsWith('series-') && editType === 'this') {
-          refreshNotifications();
-          onClose();
-          return;
-        }
-        await loadEvent();
         refreshNotifications();
+        onClose();
       } catch (err) {
         setError(err.message || '일정 수정에 실패했습니다.');
       } finally {
@@ -250,7 +251,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                 formData={formData}
                 onChange={handleChange}
                 onSubmit={handleUpdate}
-                onCancel={() => setIsEditing(false)}
+                onCancel={onClose}
                 editType={editType}
                 event={event}
                 loading={loading}
@@ -261,6 +262,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                 onOfficeToggle={(officeId) => setSelectedOfficeIds(prev =>
                   prev.includes(officeId) ? prev.filter(id => id !== officeId) : [...prev, officeId]
                 )}
+                onRecurringToggle={() => setFormData(prev => ({ ...prev, isRecurring: !prev.isRecurring }))}
               />
             )}
           </div>

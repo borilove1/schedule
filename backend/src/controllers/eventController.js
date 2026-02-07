@@ -673,6 +673,64 @@ exports.updateEvent = async (req, res) => {
       }
 
       return res.json({ success: true, data: { series: updatedSeries } });
+    } else if (req.body.isRecurring) {
+      // 단일 일정 → 반복 일정 변환
+      const startDate = actualStartAt ? actualStartAt.split('T')[0] : originalEvent.start_at.toISOString().split('T')[0];
+      const startTime = actualStartAt ? actualStartAt.split('T')[1].substring(0, 5) : toNaiveDateTimeString(originalEvent.start_at).split('T')[1].substring(0, 5);
+      const endTime = actualEndAt ? actualEndAt.split('T')[1].substring(0, 5) : toNaiveDateTimeString(originalEvent.end_at).split('T')[1].substring(0, 5);
+
+      const result = await transaction(async (client) => {
+        const seriesInsert = await client.query(`
+          INSERT INTO event_series (
+            title, content, recurrence_type, recurrence_interval, recurrence_end_date,
+            start_time, end_time, first_occurrence_date, alert, status,
+            creator_id, department_id, office_id, division_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDING', $10, $11, $12, $13)
+          RETURNING *
+        `, [
+          title || originalEvent.title,
+          content !== undefined ? content : originalEvent.content,
+          actualRecurrenceType || 'week',
+          parseInt(actualRecurrenceInterval) || 1,
+          actualRecurrenceEndDate || null,
+          startTime, endTime, startDate,
+          originalEvent.alert || 'none',
+          userId,
+          originalEvent.department_id, originalEvent.office_id, originalEvent.division_id
+        ]);
+
+        // 기존 단일 이벤트 삭제
+        await client.query('DELETE FROM event_shared_offices WHERE event_id = $1', [id]);
+        await client.query('DELETE FROM events WHERE id = $1', [id]);
+
+        // 공유 처 이전
+        if (sharedOfficeIds && sharedOfficeIds.length > 0) {
+          for (const officeId of sharedOfficeIds) {
+            await client.query(
+              'INSERT INTO event_shared_offices (series_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [seriesInsert.rows[0].id, officeId]
+            );
+          }
+        }
+
+        return seriesInsert;
+      });
+
+      const newSeries = result.rows[0];
+
+      try {
+        await createNotification(
+          userId,
+          'EVENT_UPDATED',
+          '반복 일정 변환',
+          `"${newSeries.title}" 일정이 반복 일정으로 변환되었습니다.`,
+          null
+        );
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+      }
+
+      return res.json({ success: true, data: { series: newSeries } });
     } else {
       // 일반 일정 수정 (공유 처 업데이트 포함)
       const result = await transaction(async (client) => {

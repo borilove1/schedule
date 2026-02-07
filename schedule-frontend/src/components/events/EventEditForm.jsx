@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Share2, ChevronDown } from 'lucide-react';
+import { Share2, ChevronDown, Repeat } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
 import ErrorAlert from '../common/ErrorAlert';
 
 export default function EventEditForm({
   formData, onChange, onSubmit, onCancel, editType, event, loading, actionInProgress, error,
-  offices = [], selectedOfficeIds = [], onOfficeToggle
+  offices = [], selectedOfficeIds = [], onOfficeToggle, onRecurringToggle
 }) {
   const { isDarkMode, inputBg, borderColor, textColor, cardBg, bgColor, secondaryTextColor } = useThemeColors();
   const { inputStyle, labelStyle, fontFamily } = useCommonStyles();
@@ -54,39 +54,70 @@ export default function EventEditForm({
         </div>
       </div>
 
-      {editType === 'all' && (event?.isRecurring || event?.seriesId) && (
-        <div style={{
-          padding: '20px', borderRadius: '12px', backgroundColor: inputBg,
-          marginBottom: '24px', border: `1px solid ${borderColor}`
-        }}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle}>반복 주기</label>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+      {(() => {
+        // 반복 일정 "이번만 수정"이면 반복 설정 변경 불가
+        const isRecurringThisOnly = editType === 'this' && (event?.isRecurring || event?.seriesId);
+        const canToggleRecurring = !isRecurringThisOnly && onRecurringToggle;
+
+        return (
+          <div style={{
+            padding: '16px 20px', borderRadius: '12px', backgroundColor: inputBg,
+            marginBottom: '24px', border: `1px solid ${borderColor}`
+          }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              cursor: canToggleRecurring ? 'pointer' : 'default',
+              fontFamily, fontSize: '14px', fontWeight: '500', color: textColor
+            }}>
               <input
-                type="number" name="recurrenceInterval" value={formData.recurrenceInterval}
-                onChange={onChange} min="1" max="99"
-                style={{ ...inputStyle, width: '80px', textAlign: 'center', boxSizing: 'border-box' }}
+                type="checkbox"
+                checked={!!formData.isRecurring}
+                onChange={canToggleRecurring ? onRecurringToggle : undefined}
+                disabled={!canToggleRecurring}
+                style={{ width: '18px', height: '18px', cursor: canToggleRecurring ? 'pointer' : 'default', accentColor: '#3B82F6' }}
               />
-              <select
-                name="recurrenceType" value={formData.recurrenceType} onChange={onChange}
-                style={{ ...inputStyle, width: 'auto', flex: 1, boxSizing: 'border-box', cursor: 'pointer' }}
-              >
-                <option value="day">일마다</option>
-                <option value="week">주마다</option>
-                <option value="month">개월마다</option>
-                <option value="year">년마다</option>
-              </select>
-            </div>
+              <Repeat size={16} />
+              반복 일정
+              {isRecurringThisOnly && (
+                <span style={{ fontSize: '12px', color: secondaryTextColor, fontWeight: '400' }}>
+                  (전체 수정에서 변경 가능)
+                </span>
+              )}
+            </label>
+
+            {formData.isRecurring && !isRecurringThisOnly && (
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>반복 주기</label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="number" name="recurrenceInterval" value={formData.recurrenceInterval}
+                      onChange={onChange} min="1" max="99"
+                      style={{ ...inputStyle, width: '80px', textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                    <select
+                      name="recurrenceType" value={formData.recurrenceType} onChange={onChange}
+                      style={{ ...inputStyle, width: 'auto', flex: 1, boxSizing: 'border-box', cursor: 'pointer' }}
+                    >
+                      <option value="day">일마다</option>
+                      <option value="week">주마다</option>
+                      <option value="month">개월마다</option>
+                      <option value="year">년마다</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>반복 종료일</label>
+                  <input
+                    type="date" name="recurrenceEndDate" value={formData.recurrenceEndDate}
+                    onChange={onChange} style={{ ...inputStyle, boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <label style={labelStyle}>반복 종료일</label>
-            <input
-              type="date" name="recurrenceEndDate" value={formData.recurrenceEndDate}
-              onChange={onChange} style={{ ...inputStyle, boxSizing: 'border-box' }}
-            />
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {offices.length > 0 && onOfficeToggle && (
         <div style={{ marginBottom: '20px' }}>
