@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Clock, CheckCircle, Edit, Trash2, Info, Bell } from 'lucide-react';
 import { getRelativeTime, NOTIFICATION_TYPES } from '../../utils/mockNotifications';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -37,28 +37,44 @@ export default function NotificationModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
+  // ESC 키로 모달 닫기
+  const handleEsc = useCallback((e) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [isOpen, handleEsc]);
+
+  // 모달 애니메이션
+  const [isAnimating, setIsAnimating] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => setIsAnimating(true));
+    } else {
+      setIsAnimating(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const filteredNotifications = filter === 'unread'
     ? notifications.filter(n => !n.isRead)
     : notifications;
 
-  const getIcon = (type) => {
-    const iconProps = { size: 20 };
-    switch (type) {
-      case NOTIFICATION_TYPES.EVENT_REMINDER:
-        return <Clock {...iconProps} />;
-      case NOTIFICATION_TYPES.EVENT_COMPLETED:
-        return <CheckCircle {...iconProps} />;
-      case NOTIFICATION_TYPES.EVENT_UPDATED:
-        return <Edit {...iconProps} />;
-      case NOTIFICATION_TYPES.EVENT_DELETED:
-        return <Trash2 {...iconProps} />;
-      case NOTIFICATION_TYPES.SYSTEM:
-        return <Info {...iconProps} />;
-      default:
-        return <Bell {...iconProps} />;
-    }
+  const getIconWithColor = (type) => {
+    const iconProps = { size: 18 };
+    const configs = {
+      [NOTIFICATION_TYPES.EVENT_REMINDER]: { icon: <Clock {...iconProps} />, color: '#3B82F6', bg: isDarkMode ? '#1e3a5f' : '#dbeafe' },
+      [NOTIFICATION_TYPES.EVENT_COMPLETED]: { icon: <CheckCircle {...iconProps} />, color: '#10b981', bg: isDarkMode ? '#1c3b2a' : '#d1fae5' },
+      [NOTIFICATION_TYPES.EVENT_UPDATED]: { icon: <Edit {...iconProps} />, color: '#f59e0b', bg: isDarkMode ? '#3b2f1a' : '#fef3c7' },
+      [NOTIFICATION_TYPES.EVENT_DELETED]: { icon: <Trash2 {...iconProps} />, color: '#ef4444', bg: isDarkMode ? '#3b1a1a' : '#fee2e2' },
+      [NOTIFICATION_TYPES.SYSTEM]: { icon: <Info {...iconProps} />, color: '#8b5cf6', bg: isDarkMode ? '#2d1f5e' : '#ede9fe' },
+    };
+    return configs[type] || { icon: <Bell {...iconProps} />, color: '#3B82F6', bg: isDarkMode ? '#1e3a5f' : '#dbeafe' };
   };
 
   const handleMarkAsRead = async (notificationId) => {
@@ -105,16 +121,20 @@ export default function NotificationModal({ isOpen, onClose }) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notification-modal-title"
       onClick={handleBackdropClick}
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: isAnimating ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '20px'
+        padding: '20px',
+        transition: 'background-color 0.2s ease',
       }}
     >
       <div
@@ -123,6 +143,9 @@ export default function NotificationModal({ isOpen, onClose }) {
           backgroundColor: cardBg,
           borderRadius: '16px',
           width: '100%',
+          transform: isAnimating ? 'translateY(0)' : 'translateY(20px)',
+          opacity: isAnimating ? 1 : 0,
+          transition: 'transform 0.25s ease, opacity 0.2s ease',
           maxWidth: '600px',
           maxHeight: '90vh',
           display: 'flex',
@@ -142,7 +165,7 @@ export default function NotificationModal({ isOpen, onClose }) {
           gap: '16px'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: textColor }}>알림</h2>
+            <h2 id="notification-modal-title" style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: textColor }}>알림</h2>
             <button
               onClick={onClose}
               style={{
@@ -214,9 +237,19 @@ export default function NotificationModal({ isOpen, onClose }) {
                     }} />
                   )}
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <div style={{ color: '#3B82F6', flexShrink: 0, marginTop: '2px' }}>
-                      {getIcon(notification.type)}
-                    </div>
+                    {(() => {
+                      const { icon, color, bg } = getIconWithColor(notification.type);
+                      return (
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '50%',
+                          backgroundColor: bg, color,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>
+                          {icon}
+                        </div>
+                      );
+                    })()}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: textColor, marginBottom: '4px' }}>
                         {notification.title}

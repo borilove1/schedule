@@ -2,12 +2,14 @@ import { useMemo } from 'react';
 import { useThemeColors } from './useThemeColors';
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", sans-serif';
+const FOCUS_RING = '0 0 0 3px rgba(59,130,246,0.4)';
 
 export function useCommonStyles() {
   const colors = useThemeColors();
 
   return useMemo(() => ({
     fontFamily: FONT_FAMILY,
+    focusRing: FOCUS_RING,
 
     inputStyle: {
       width: '100%',
@@ -20,6 +22,7 @@ export function useCommonStyles() {
       outline: 'none',
       boxSizing: 'border-box',
       fontFamily: FONT_FAMILY,
+      transition: 'border-color 0.2s, box-shadow 0.2s',
     },
 
     labelStyle: {
@@ -43,6 +46,7 @@ export function useCommonStyles() {
       boxSizing: 'border-box',
       fontFamily: FONT_FAMILY,
       cursor: 'pointer',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
     },
   }), [colors]);
 }

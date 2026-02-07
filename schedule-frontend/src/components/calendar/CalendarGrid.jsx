@@ -39,7 +39,7 @@ const CalendarGrid = React.memo(function CalendarGrid({
         {weeks.map((week, weekIdx) => {
           const weekMultiDay = getMultiDayEventsForWeek(week, events);
           const lanes = assignLanes(weekMultiDay);
-          const maxMultiLanes = 3;
+          const maxMultiLanes = 4;
           const visibleLanes = lanes.slice(0, maxMultiLanes);
           const hiddenLanes = lanes.slice(maxMultiLanes);
           const laneHeight = 19;
@@ -58,8 +58,9 @@ const CalendarGrid = React.memo(function CalendarGrid({
                 {week.map((day, col) => {
                   const dayIsToday = day.toDateString() === today.toDateString();
                   const dayIsSelected = selectedDay && day.toDateString() === selectedDay.toDateString();
+                  const dayInMonth = day.getMonth() === curMonth;
 
-                  let bg = 'transparent';
+                  let bg = dayInMonth ? 'transparent' : (isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)');
                   let border = 'none';
                   if (dayIsToday && dayIsSelected) {
                     bg = isDarkMode ? '#3B82F630' : '#3B82F635';
@@ -121,7 +122,7 @@ const CalendarGrid = React.memo(function CalendarGrid({
 
                 {/* Multi-day spanning bars */}
                 {visibleLanes.length > 0 && (
-                  <div style={{ position: 'relative', height: `${multiAreaHeight}px` }}>
+                  <div style={{ position: 'relative', height: 0, overflow: 'visible', zIndex: 2 }}>
                     {visibleLanes.map((lane, laneIdx) =>
                       lane.map(bar => {
                         const isOwn = bar.event.creator?.id === userId;
@@ -132,6 +133,7 @@ const CalendarGrid = React.memo(function CalendarGrid({
                         return (
                           <div
                             key={bar.event.id}
+                            title={bar.event.title}
                             style={{
                               position: 'absolute',
                               top: `${laneIdx * laneHeight}px`,
@@ -170,6 +172,15 @@ const CalendarGrid = React.memo(function CalendarGrid({
                   gap: '0 2px'
                 }}>
                   {week.map((day, col) => {
+                    // Find the highest occupied lane in this cell for tight packing
+                    let maxOccupiedLane = -1;
+                    visibleLanes.forEach((lane, laneIdx) => {
+                      if (lane.some(bar => (col + 1) >= bar.startCol && (col + 1) <= bar.endCol)) {
+                        maxOccupiedLane = laneIdx;
+                      }
+                    });
+                    const cellMultiPad = maxOccupiedLane >= 0 ? (maxOccupiedLane + 1) * laneHeight : 0;
+
                     const visibleMultiInCell = visibleLanes.reduce((count, lane) =>
                       count + lane.filter(bar => (col + 1) >= bar.startCol && (col + 1) <= bar.endCol).length
                     , 0);
@@ -182,16 +193,17 @@ const CalendarGrid = React.memo(function CalendarGrid({
                     const showSingles = Math.min(singles.length, remainingSlots);
                     const hiddenCount = hiddenMultiInCell + (singles.length - showSingles);
 
-                    if (showSingles === 0 && hiddenCount === 0) return <div key={col} />;
+                    if (showSingles === 0 && hiddenCount === 0) return <div key={col} style={{ paddingTop: `${cellMultiPad}px` }} />;
 
                     return (
-                      <div key={col} style={{ padding: '0 3px', overflow: 'hidden' }}>
+                      <div key={col} style={{ paddingTop: `${cellMultiPad}px`, paddingLeft: '3px', paddingRight: '3px', overflow: 'hidden' }}>
                         {singles.slice(0, showSingles).map(ev => {
                           const isOwn = ev.creator?.id === userId;
                           const barColor = isOwn ? getStatusColor(ev.status) : '#94a3b8';
                           return (
                             <div
                               key={ev.id}
+                              title={ev.title}
                               style={{
                                 fontSize: '10px',
                                 padding: '2px 4px',

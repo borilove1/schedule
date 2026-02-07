@@ -89,6 +89,7 @@ export default function MainLayout({ children, currentPage, onNavigate }) {
               display: 'flex',
               alignItems: 'center'
             }}
+            title={isDarkMode ? '라이트 모드로 전환' : '다크 모드로 전환'}
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>

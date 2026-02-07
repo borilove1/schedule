@@ -8,17 +8,19 @@ import CalendarHeader from './CalendarHeader';
 import CalendarGrid from './CalendarGrid';
 import EventList from './EventList';
 import { getCalendarDays, getWeeks, getEventsForDate, filterEventsByTab } from './calendarHelpers';
+import Skeleton from '../common/Skeleton';
 import api from '../../utils/api';
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", sans-serif';
 
 export default function Calendar() {
   const { user } = useAuth();
-  const { textColor } = useThemeColors();
+  const { textColor, borderColor, cardBg } = useThemeColors();
   const isMobile = useIsMobile();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -27,6 +29,7 @@ export default function Calendar() {
   const [selectedTab, setSelectedTab] = useState('all');
 
   const loadEvents = useCallback(async () => {
+    setEventsLoading(true);
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -56,6 +59,8 @@ export default function Calendar() {
       setEvents(loaded);
     } catch (err) {
       console.error('Failed to load events:', err);
+    } finally {
+      setEventsLoading(false);
     }
   }, [currentDate]);
 
@@ -131,16 +136,31 @@ export default function Calendar() {
         userId={user?.id}
       />
 
-      <EventList
-        events={filteredListEvents}
-        allEventsCount={events.length}
-        selectedDay={selectedDay}
-        selectedTab={selectedTab}
-        onTabChange={setSelectedTab}
-        onClearSelection={() => setSelectedDay(null)}
-        onEventClick={handleEventClick}
-        userId={user?.id}
-      />
+      {eventsLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{
+              padding: '16px', borderRadius: '10px',
+              backgroundColor: cardBg, border: `1px solid ${borderColor}`,
+              borderLeft: '4px solid transparent',
+            }}>
+              <Skeleton width="60%" height="18px" style={{ marginBottom: '8px' }} />
+              <Skeleton width="40%" height="14px" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EventList
+          events={filteredListEvents}
+          allEventsCount={events.length}
+          selectedDay={selectedDay}
+          selectedTab={selectedTab}
+          onTabChange={setSelectedTab}
+          onClearSelection={() => setSelectedDay(null)}
+          onEventClick={handleEventClick}
+          userId={user?.id}
+        />
+      )}
 
       <EventModal
         isOpen={showModal}

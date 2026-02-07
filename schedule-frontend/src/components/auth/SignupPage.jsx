@@ -4,7 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
 import ErrorAlert from '../common/ErrorAlert';
-import { Calendar, ArrowLeft, Sun, Moon, CheckCircle } from 'lucide-react';
+import { Calendar, ArrowLeft, Sun, Moon, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import api from '../../utils/api';
 
 export default function SignupPage({ onBackClick }) {
@@ -31,6 +31,8 @@ export default function SignupPage({ onBackClick }) {
     departments: {}
   });
   const [loadingOrgs, setLoadingOrgs] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   // 조직 구조 로드
   useEffect(() => {
@@ -272,34 +274,79 @@ export default function SignupPage({ onBackClick }) {
 
           <div style={{ marginBottom: '20px' }}>
             <label style={labelStyle}>비밀번호 *</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength={8}
-              style={inputStyle}
-              placeholder="영문, 숫자 포함 8자 이상"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                minLength={8}
+                style={{ ...inputStyle, paddingRight: '44px' }}
+                placeholder="영문, 숫자 포함 8자 이상"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: secondaryTextColor,
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title={showPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div style={{ marginBottom: '20px' }}>
             <label style={labelStyle}>비밀번호 확인 *</label>
-            <input
-              type="password"
-              name="passwordConfirm"
-              value={formData.passwordConfirm}
-              onChange={handleChange}
-              required
-              minLength={8}
-              style={{
-                ...inputStyle,
-                borderColor: formData.passwordConfirm && formData.password !== formData.passwordConfirm
-                  ? '#ef4444' : borderColor
-              }}
-              placeholder="비밀번호를 다시 입력하세요"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPasswordConfirm ? 'text' : 'password'}
+                name="passwordConfirm"
+                value={formData.passwordConfirm}
+                onChange={handleChange}
+                required
+                minLength={8}
+                style={{
+                  ...inputStyle,
+                  paddingRight: '44px',
+                  borderColor: formData.passwordConfirm && formData.password !== formData.passwordConfirm
+                    ? '#ef4444' : borderColor
+                }}
+                placeholder="비밀번호를 다시 입력하세요"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: secondaryTextColor,
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title={showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 표시'}
+              >
+                {showPasswordConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {formData.passwordConfirm && formData.password !== formData.passwordConfirm && (
               <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
                 비밀번호가 일치하지 않습니다.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Share2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -67,7 +67,34 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ESC 키로 모달 닫기
+  const handleEsc = useCallback((e) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [isOpen, handleEsc]);
+
+  // 모달 애니메이션
+  const [isAnimating, setIsAnimating] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => setIsAnimating(true));
+    } else {
+      setIsAnimating(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const dateInputStyle = {
+    ...inputStyle,
+    colorScheme: isDarkMode ? 'dark' : 'light',
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -125,23 +152,32 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
   };
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.7)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000, padding: '20px'
-    }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="event-modal-title"
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: isAnimating ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000, padding: '20px',
+        transition: 'background-color 0.2s ease',
+      }}
+    >
       <div style={{
         backgroundColor: cardBg, borderRadius: '16px',
         width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', fontFamily
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', fontFamily,
+        transform: isAnimating ? 'translateY(0)' : 'translateY(20px)',
+        opacity: isAnimating ? 1 : 0,
+        transition: 'transform 0.25s ease, opacity 0.2s ease',
       }}>
         {/* Header */}
         <div style={{
           padding: '24px', borderBottom: `1px solid ${borderColor}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}>
-          <h2 style={{ fontSize: '24px', fontWeight: '600', margin: 0 }}>새 일정 만들기</h2>
+          <h2 id="event-modal-title" style={{ fontSize: '24px', fontWeight: '600', margin: 0 }}>새 일정 만들기</h2>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', color: textColor, cursor: 'pointer', padding: '4px'
           }}>
@@ -171,22 +207,22 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div>
               <label style={labelStyle}>시작 날짜 *</label>
-              <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} required style={inputStyle} />
+              <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} required style={dateInputStyle} />
             </div>
             <div>
               <label style={labelStyle}>시작 시간 *</label>
-              <input type="time" name="startTime" value={formData.startTime} onChange={handleChange} required style={inputStyle} />
+              <input type="time" name="startTime" value={formData.startTime} onChange={handleChange} required style={dateInputStyle} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div>
               <label style={labelStyle}>종료 날짜 *</label>
-              <input type="date" name="endDate" value={formData.endDate} onChange={handleChange} required style={inputStyle} />
+              <input type="date" name="endDate" value={formData.endDate} onChange={handleChange} required style={dateInputStyle} />
             </div>
             <div>
               <label style={labelStyle}>종료 시간 *</label>
-              <input type="time" name="endTime" value={formData.endTime} onChange={handleChange} required style={inputStyle} />
+              <input type="time" name="endTime" value={formData.endTime} onChange={handleChange} required style={dateInputStyle} />
             </div>
           </div>
 
@@ -318,7 +354,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
               </div>
               <div>
                 <label style={labelStyle}>반복 종료일 *</label>
-                <input type="date" name="recurrenceEndDate" value={formData.recurrenceEndDate} onChange={handleChange} required={formData.isRecurring} min={formData.startDate} style={inputStyle} />
+                <input type="date" name="recurrenceEndDate" value={formData.recurrenceEndDate} onChange={handleChange} required={formData.isRecurring} min={formData.startDate} style={dateInputStyle} />
                 <p style={{ marginTop: '8px', fontSize: '13px', color: secondaryTextColor, fontFamily }}>이 날짜까지 반복됩니다</p>
               </div>
             </div>

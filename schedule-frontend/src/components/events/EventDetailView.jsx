@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, Check, Calendar, Clock, User, Repeat, Eye, Users } from 'lucide-react';
+import { Edit2, Trash2, Check, Calendar, Clock, Repeat, Eye, Users } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { getStatusColor, getStatusText, getRecurrenceDescription } from '../../utils/eventHelpers';
 import ErrorAlert from '../common/ErrorAlert';
@@ -50,30 +50,82 @@ export default function EventDetailView({
         </div>
       )}
 
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: secondaryTextColor, fontSize: '14px', marginBottom: '8px' }}>
-          <Calendar size={16} />
-          <span>{event.startAt ? new Date(event.startAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
+      {/* 일정 정보 카드 */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px',
+        marginBottom: '16px'
+      }}>
+        <div style={{
+          padding: '14px',
+          borderRadius: '10px',
+          backgroundColor: inputBg,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <Calendar size={15} color="#3B82F6" />
+            <span style={{ fontSize: '12px', color: secondaryTextColor, fontWeight: '500' }}>날짜</span>
+          </div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: '500' }}>
+            {event.startAt ? new Date(event.startAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}
+          </div>
+          {event.startAt && event.endAt && new Date(event.startAt).toDateString() !== new Date(event.endAt).toDateString() && (
+            <div style={{ fontSize: '13px', color: secondaryTextColor, marginTop: '2px' }}>
+              ~ {new Date(event.endAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: secondaryTextColor, fontSize: '14px', marginBottom: '8px' }}>
-          <Clock size={16} />
-          <span>
+        <div style={{
+          padding: '14px',
+          borderRadius: '10px',
+          backgroundColor: inputBg,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <Clock size={15} color="#3B82F6" />
+            <span style={{ fontSize: '12px', color: secondaryTextColor, fontWeight: '500' }}>시간</span>
+          </div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: '500' }}>
             {event.startAt && event.endAt
               ? `${new Date(event.startAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} ~ ${new Date(event.endAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`
-              : ''}
-          </span>
+              : '-'}
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: secondaryTextColor, fontSize: '14px' }}>
-          <User size={16} />
-          <span>{event.creator?.name || '알 수 없음'} {event.department && `(${event.department})`}</span>
+      </div>
+
+      {/* 작성자 + 반복/공유 정보 */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: recurrenceDesc || (event.sharedOffices?.length > 0) ? '10px' : '0' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            backgroundColor: '#3B82F6',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            fontWeight: '600',
+            flexShrink: 0,
+          }}>
+            {(event.creator?.name || '?').charAt(0)}
+          </div>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>
+              {event.creator?.name || '알 수 없음'}
+            </div>
+            {event.department && (
+              <div style={{ fontSize: '12px', color: secondaryTextColor }}>{event.department}</div>
+            )}
+          </div>
         </div>
         {recurrenceDesc && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3B82F6', fontSize: '14px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3B82F6', fontSize: '14px', marginBottom: '6px' }}>
             <Repeat size={16} /><span>{recurrenceDesc}</span>
           </div>
         )}
         {event.sharedOffices && event.sharedOffices.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6', fontSize: '14px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6', fontSize: '14px' }}>
             <Users size={16} />
             <span>공유: {event.sharedOffices.map(o => o.name || o.officeName || o.office_name).join(', ')}</span>
           </div>

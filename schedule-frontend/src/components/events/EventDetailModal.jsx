@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import api from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -207,23 +207,54 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
     }
   };
 
+  // ESC 키로 모달 닫기
+  const handleEsc = useCallback((e) => {
+    if (e.key === 'Escape' && !activeDialog) onClose();
+  }, [onClose, activeDialog]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [isOpen, handleEsc]);
+
+  // 모달 애니메이션
+  const [isAnimating, setIsAnimating] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => setIsAnimating(true));
+    } else {
+      setIsAnimating(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
-    }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="event-detail-modal-title"
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: isAnimating ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px',
+        transition: 'background-color 0.2s ease',
+      }}
+    >
       <div style={{
         backgroundColor: cardBg, borderRadius: '16px', width: '100%',
-        maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', fontFamily: FONT_FAMILY
+        maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', fontFamily: FONT_FAMILY,
+        transform: isAnimating ? 'translateY(0)' : 'translateY(20px)',
+        opacity: isAnimating ? 1 : 0,
+        transition: 'transform 0.25s ease, opacity 0.2s ease',
       }}>
         <div style={{
           padding: '24px', borderBottom: `1px solid ${borderColor}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}>
-          <h2 style={{ fontSize: '24px', fontWeight: '600', margin: 0, color: textColor }}>
+          <h2 id="event-detail-modal-title" style={{ fontSize: '24px', fontWeight: '600', margin: 0, color: textColor }}>
             {isEditing ? (editType === 'all' ? '반복 일정 수정' : '일정 수정') : '일정 상세'}
           </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: textColor, cursor: 'pointer' }}>

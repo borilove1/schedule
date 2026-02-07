@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { getStatusColor, getStatusText, norm } from '../../utils/eventHelpers';
@@ -8,6 +9,13 @@ const EventList = React.memo(function EventList({
 }) {
   const { isDarkMode, textColor, secondaryTextColor, cardBg, borderColor } = useThemeColors();
   const isMobile = useIsMobile();
+  const [displayCount, setDisplayCount] = useState(10);
+  const [hoveredId, setHoveredId] = useState(null);
+
+  // 탭/필터/날짜 변경 시 displayCount 리셋
+  useEffect(() => {
+    setDisplayCount(10);
+  }, [selectedTab, selectedDay]);
 
   return (
     <div id="event-list">
@@ -89,7 +97,7 @@ const EventList = React.memo(function EventList({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {events.slice(0, 20).map(event => {
+          {events.slice(0, displayCount).map(event => {
             const startDate = new Date(event.startAt);
             const endDate = new Date(event.endAt);
             const isMultiDayEvent = norm(startDate).getTime() !== norm(endDate).getTime();
@@ -99,6 +107,8 @@ const EventList = React.memo(function EventList({
               <div
                 key={event.id}
                 onClick={() => onEventClick(event.id)}
+                onMouseEnter={() => setHoveredId(event.id)}
+                onMouseLeave={() => setHoveredId(null)}
                 style={{
                   padding: isMobile ? '14px' : '16px',
                   borderRadius: '10px',
@@ -106,15 +116,11 @@ const EventList = React.memo(function EventList({
                   border: `1px solid ${borderColor}`,
                   borderLeft: `4px solid ${isOwnEvent ? getStatusColor(event.status) : '#94a3b8'}`,
                   cursor: 'pointer',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = isDarkMode ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  transform: hoveredId === event.id ? 'translateY(-1px)' : 'translateY(0)',
+                  boxShadow: hoveredId === event.id
+                    ? (isDarkMode ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.08)')
+                    : 'none',
                 }}
               >
                 <div style={{
@@ -200,6 +206,33 @@ const EventList = React.memo(function EventList({
               </div>
             );
           })}
+          {events.length > displayCount && (
+            <button
+              onClick={() => setDisplayCount(prev => prev + 10)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '10px',
+                border: `1px solid ${borderColor}`,
+                backgroundColor: 'transparent',
+                color: secondaryTextColor,
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                marginTop: '4px',
+                transition: 'background-color 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? '#334155' : '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <ChevronDown size={16} />
+              더보기 ({events.length - displayCount}개 남음)
+            </button>
+          )}
         </div>
       )}
     </div>
