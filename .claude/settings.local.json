@@ -23,7 +23,28 @@
       "Bash(python:*)",
       "Bash(PYTHONUTF8=1 python:*)",
       "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_close"
+      "mcp__playwright__browser_close",
+      "Bash(timeout:*)",
+      "Bash(openssl req:*)",
+      "Bash(set:*)",
+      "mcp__playwright__browser_run_code",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_type",
+      "Bash(npm:*)",
+      "mcp__playwright__browser_install",
+      "mcp__playwright__browser_network_requests",
+      "Bash(ssh:*)",
+      "Bash(if not exist \"d:\\\\schedule\\\\schedule-frontend\\\\src\\\\components\\\\profile\" mkdir \"d:\\\\schedule\\\\schedule-frontend\\\\src\\\\components\\\\profile\")",
+      "mcp__playwright__browser_resize",
+      "Bash(claude mcp add:*)",
+      "mcp__figma__whoami",
+      "mcp__figma__create_design_system_rules"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7",
+    "playwright"
+  ]
 }
