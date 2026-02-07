@@ -43,7 +43,6 @@ const CalendarGrid = React.memo(function CalendarGrid({
           const visibleLanes = lanes.slice(0, maxMultiLanes);
           const hiddenLanes = lanes.slice(maxMultiLanes);
           const laneHeight = 19;
-          const multiAreaHeight = visibleLanes.length * laneHeight;
 
           return (
             <div key={weekIdx} style={{ position: 'relative', minHeight: '130px' }}>

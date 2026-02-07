@@ -8,9 +8,10 @@ import api from '../../utils/api';
 
 const getInitialFormData = (selectedDate) => {
   const dateStr = selectedDate || new Date().toISOString().split('T')[0];
-  const threeMonthsLater = new Date();
-  threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
-  const endDateStr = `${threeMonthsLater.getFullYear()}-${String(threeMonthsLater.getMonth() + 1).padStart(2, '0')}-${String(threeMonthsLater.getDate()).padStart(2, '0')}`;
+  const baseDate = new Date(dateStr + 'T00:00:00');
+  const oneMonthLater = new Date(baseDate);
+  oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+  const endDateStr = `${oneMonthLater.getFullYear()}-${String(oneMonthLater.getMonth() + 1).padStart(2, '0')}-${String(oneMonthLater.getDate()).padStart(2, '0')}`;
 
   return {
     title: '',
