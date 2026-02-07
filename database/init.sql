@@ -128,12 +128,15 @@ CREATE TABLE event_series (
     -- 알림
     alert alert_time DEFAULT 'none',
 
+    -- 다일(multi-day) 일정 지원
+    duration_days INTEGER DEFAULT 0,
+
     -- 작성자 및 조직 정보
     creator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
     office_id INTEGER REFERENCES offices(id) ON DELETE SET NULL,
     division_id INTEGER REFERENCES divisions(id) ON DELETE SET NULL,
-    
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -200,8 +203,50 @@ CREATE INDEX idx_events_series ON events(series_id);
 CREATE INDEX idx_event_series_creator ON event_series(creator_id);
 CREATE INDEX idx_event_exceptions_series ON event_exceptions(series_id);
 
+-- 일정 공유 처/실 테이블
+CREATE TABLE event_shared_offices (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+    series_id INTEGER REFERENCES event_series(id) ON DELETE CASCADE,
+    office_id INTEGER NOT NULL REFERENCES offices(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_event_or_series CHECK (
+        (event_id IS NOT NULL AND series_id IS NULL) OR
+        (event_id IS NULL AND series_id IS NOT NULL)
+    ),
+    UNIQUE(event_id, office_id),
+    UNIQUE(series_id, office_id)
+);
+
+CREATE INDEX idx_eso_event_id ON event_shared_offices(event_id) WHERE event_id IS NOT NULL;
+CREATE INDEX idx_eso_series_id ON event_shared_offices(series_id) WHERE series_id IS NOT NULL;
+CREATE INDEX idx_eso_office_id ON event_shared_offices(office_id);
+
 -- ========================================
--- 4. 댓글 테이블
+-- 4. 알림 테이블
+-- ========================================
+
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    related_event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+    related_series_id INTEGER REFERENCES event_series(id) ON DELETE SET NULL,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = false;
+
+-- ========================================
+-- 5. 댓글 테이블
 -- ========================================
 
 CREATE TABLE comments (
@@ -233,7 +278,7 @@ CREATE INDEX idx_comments_author ON comments(author_id);
 CREATE INDEX idx_comments_created ON comments(created_at);
 
 -- ========================================
--- 5. 시스템 설정 테이블
+-- 6. 시스템 설정 테이블
 -- ========================================
 
 CREATE TABLE system_settings (
@@ -255,7 +300,7 @@ INSERT INTO system_settings (key, value, description) VALUES
     ('session_timeout', '60', '세션 타임아웃 (분)');
 
 -- ========================================
--- 6. 세션 테이블 (JWT 대신 사용 가능)
+-- 7. 세션 테이블 (JWT 대신 사용 가능)
 -- ========================================
 
 CREATE TABLE sessions (
@@ -274,7 +319,7 @@ CREATE INDEX idx_sessions_token ON sessions(token);
 CREATE INDEX idx_sessions_expires ON sessions(expires_at);
 
 -- ========================================
--- 7. 업데이트 트리거 함수
+-- 8. 업데이트 트리거 함수
 -- ========================================
 
 -- updated_at 자동 업데이트 함수
@@ -309,7 +354,7 @@ CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON comments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ========================================
--- 8. 샘플 데이터 (개발/테스트용)
+-- 9. 샘플 데이터 (개발/테스트용)
 -- ========================================
 
 -- 본부
@@ -369,7 +414,7 @@ INSERT INTO departments (name, office_id) VALUES
 -- 안전재난부, 각 지사는 하위 부서 없음
 
 -- ========================================
--- 9. 유용한 뷰 (View)
+-- 10. 유용한 뷰 (View)
 -- ========================================
 
 -- 사용자 전체 정보 뷰 (조직 정보 포함)
@@ -434,7 +479,7 @@ FROM comments c
 JOIN users u ON c.author_id = u.id;
 
 -- ========================================
--- 10. 권한 체크 함수 (헬퍼)
+-- 11. 권한 체크 함수 (헬퍼)
 -- ========================================
 
 -- 사용자가 일정을 볼 수 있는지 확인하는 함수
