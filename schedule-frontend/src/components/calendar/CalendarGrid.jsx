@@ -17,17 +17,19 @@ const CalendarGrid = React.memo(function CalendarGrid({
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(7, 1fr)',
-        borderBottom: `1px solid ${borderColor}60`,
-        marginBottom: '0'
+        marginBottom: '6px',
+        gap: '0 4px'
       }}>
         {['월', '화', '수', '목', '금', '토', '일'].map((name, i) => (
           <div key={name} style={{
             textAlign: 'center',
-            padding: '8px 0',
+            padding: '5px 0',
             fontSize: '14px',
             fontWeight: '600',
-            color: i === 5 ? (isDarkMode ? '#60A5FA' : '#3B82F6') : i === 6 ? (isDarkMode ? '#F87171' : '#ef4444') : '#94a3b8',
-            letterSpacing: '0.05em'
+            color: i === 5 ? (isDarkMode ? '#60A5FA' : '#3B82F6') : i === 6 ? (isDarkMode ? '#F87171' : '#ef4444') : (isDarkMode ? '#94a3b8' : '#64748b'),
+            letterSpacing: '0.05em',
+            backgroundColor: isDarkMode ? '#1e293b' : '#e2e8f0',
+            borderRadius: '6px'
           }}>
             {name}
           </div>
