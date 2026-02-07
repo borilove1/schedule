@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { useThemeColors } from './hooks/useThemeColors';
+import LoadingSpinner from './components/common/LoadingSpinner';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import MainLayout from './components/layout/MainLayout';
@@ -21,36 +23,19 @@ function AppContent() {
     }
   }, [user, loading]);
 
-  const { isDarkMode } = useTheme();
+  const { bgColor, textColor } = useThemeColors();
 
   if (loading) {
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+        backgroundColor: bgColor,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: isDarkMode ? '#e2e8f0' : '#1e293b'
+        color: textColor
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: isDarkMode ? '4px solid #475569' : '4px solid #cbd5e1',
-            borderTop: '4px solid #3B82F6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px'
-          }}></div>
-          <div>로딩 중...</div>
-        </div>
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
+        <LoadingSpinner message="로딩 중..." />
       </div>
     );
   }

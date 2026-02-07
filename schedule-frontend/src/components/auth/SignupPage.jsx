@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { useCommonStyles } from '../../hooks/useCommonStyles';
+import ErrorAlert from '../common/ErrorAlert';
 import { Calendar, ArrowLeft, Sun, Moon } from 'lucide-react';
 import api from '../../utils/api';
 
 export default function SignupPage({ onBackClick }) {
   const { register } = useAuth();
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { toggleDarkMode } = useTheme();
+  const { isDarkMode, bgColor, cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
+  const { inputStyle, labelStyle } = useCommonStyles();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -25,13 +30,6 @@ export default function SignupPage({ onBackClick }) {
     departments: {}
   });
   const [loadingOrgs, setLoadingOrgs] = useState(true);
-
-  const bgColor = isDarkMode ? '#0f172a' : '#f8fafc';
-  const cardBg = isDarkMode ? '#283548' : '#ffffff';
-  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
-  const secondaryTextColor = isDarkMode ? '#94a3b8' : '#64748b';
-  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
-  const inputBg = isDarkMode ? '#1e293b' : '#f8fafc';
 
   // 조직 구조 로드
   useEffect(() => {
@@ -58,7 +56,6 @@ export default function SignupPage({ onBackClick }) {
         setLoadingOrgs(false);
       } catch (error) {
         console.error('Failed to load organizations:', error);
-        // 기본값 사용
         setOrganizations({
           divisions: ['부산울산본부'],
           offices: {
@@ -85,35 +82,16 @@ export default function SignupPage({ onBackClick }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // 본부 변경 시 처와 부서 초기화
     if (name === 'division') {
-      setFormData({
-        ...formData,
-        division: value,
-        office: '',
-        department: ''
-      });
-    }
-    // 처 변경 시 부서 초기화
-    else if (name === 'office') {
-      setFormData({
-        ...formData,
-        office: value,
-        department: ''
-      });
-    }
-    else {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
+      setFormData({ ...formData, division: value, office: '', department: '' });
+    } else if (name === 'office') {
+      setFormData({ ...formData, office: value, department: '' });
+    } else {
+      setFormData({ ...formData, [name]: value });
     }
   };
 
-  // 선택 가능한 처 목록
   const availableOffices = formData.division ? (organizations.offices[formData.division] || []) : [];
-
-  // 선택 가능한 부서 목록
   const availableDepartments = formData.office ? (organizations.departments[formData.office] || []) : [];
 
   const handleSubmit = async (e) => {
@@ -145,26 +123,6 @@ export default function SignupPage({ onBackClick }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px',
-    borderRadius: '8px',
-    border: `1px solid ${borderColor}`,
-    backgroundColor: inputBg,
-    color: textColor,
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: textColor,
-    marginBottom: '8px'
   };
 
   return (
@@ -381,18 +339,7 @@ export default function SignupPage({ onBackClick }) {
             )}
           </div>
 
-          {error && (
-            <div style={{
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
-              color: isDarkMode ? '#fca5a5' : '#dc2626',
-              fontSize: '14px',
-              marginBottom: '20px'
-            }}>
-              {error}
-            </div>
-          )}
+          <ErrorAlert message={error} />
 
           <button
             type="submit"

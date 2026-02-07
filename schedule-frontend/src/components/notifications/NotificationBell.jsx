@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Bell } from 'lucide-react';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import NotificationModal from './NotificationModal';
 import { useNotification } from '../../contexts/NotificationContext';
 
-export default function NotificationBell({ darkMode, textColor }) {
+export default function NotificationBell() {
   const [showModal, setShowModal] = useState(false);
   const { unreadCount, loadUnreadCount } = useNotification();
+  const { textColor } = useThemeColors();
 
   // Refresh unread count when modal closes
   const handleModalClose = () => {
@@ -61,7 +63,6 @@ export default function NotificationBell({ darkMode, textColor }) {
       <NotificationModal
         isOpen={showModal}
         onClose={handleModalClose}
-        darkMode={darkMode}
       />
     </>
   );

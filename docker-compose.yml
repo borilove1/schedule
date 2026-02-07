@@ -62,13 +62,14 @@ services:
     container_name: schedule-frontend
     restart: always
     ports:
-      - "8080:80"  # 외부:8080 → 내부:80 (Nginx 리버스 프록시가 80 → 8080 전달)
+      - "443:443"   # HTTPS
+      - "8080:80"   # HTTP (→ HTTPS 리다이렉트)
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro  # SSL 인증서 마운트
     depends_on:
       - backend
     networks:
       - schedule-network
-    environment:
-      - REACT_APP_API_URL=http://localhost:3001
 
 networks:
   schedule-network:

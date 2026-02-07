@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
 
 const NotificationContext = createContext();
@@ -33,11 +33,11 @@ export function NotificationProvider({ children }) {
     return () => clearInterval(interval);
   }, [loadUnreadCount]);
 
-  const value = {
+  const value = useMemo(() => ({
     unreadCount,
     loadUnreadCount,
-    refreshNotifications: loadUnreadCount // Alias for clarity
-  };
+    refreshNotifications: loadUnreadCount
+  }), [unreadCount, loadUnreadCount]);
 
   return (
     <NotificationContext.Provider value={value}>

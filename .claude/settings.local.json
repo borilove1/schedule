@@ -9,7 +9,21 @@
       "Bash(docker exec:*)",
       "Bash(npm run build:*)",
       "Bash(powershell.exe -Command \"cd d:\\\\schedule; docker-compose restart frontend 2>&1\")",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "mcp__context7__resolve-library-id",
+      "Bash(cmd /c \"node --version && npm --version && npx --version\")",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_select_option",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_evaluate",
+      "Bash(timeout 30 bash -c 'until curl -s http://localhost:8080/api/v1/auth/me > /dev/null 2>&1; do sleep 2; done')",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(PYTHONUTF8=1 python:*)",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_close"
     ]
   }
 }

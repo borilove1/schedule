@@ -1,22 +1,16 @@
 import React, { useState } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import ErrorAlert from '../common/ErrorAlert';
 import { X } from 'lucide-react';
 import api from '../../utils/api';
 
 const TYPE_LABELS = { division: '본부', office: '처/실', department: '부서' };
 
 export default function OrgNodeEditModal({ type, mode, data, parentId, parentName, divisions, onClose, onSaved }) {
-  const { isDarkMode } = useTheme();
+  const { cardBg, textColor, secondaryTextColor, borderColor, inputBg } = useThemeColors();
   const [name, setName] = useState(data?.name || '');
-  const [selectedParent, setSelectedParent] = useState(parentId || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const cardBg = isDarkMode ? '#283548' : '#ffffff';
-  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
-  const secondaryText = isDarkMode ? '#94a3b8' : '#64748b';
-  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
-  const inputBg = isDarkMode ? '#1e293b' : '#f8fafc';
 
   const inputStyle = {
     width: '100%',
@@ -40,23 +34,14 @@ export default function OrgNodeEditModal({ type, mode, data, parentId, parentNam
     setError('');
     try {
       if (type === 'division') {
-        if (mode === 'create') {
-          await api.createDivision(name.trim());
-        } else {
-          await api.updateDivision(data.id, name.trim());
-        }
+        if (mode === 'create') await api.createDivision(name.trim());
+        else await api.updateDivision(data.id, name.trim());
       } else if (type === 'office') {
-        if (mode === 'create') {
-          await api.createOffice(name.trim(), parentId);
-        } else {
-          await api.updateOffice(data.id, { name: name.trim(), divisionId: selectedParent || undefined });
-        }
+        if (mode === 'create') await api.createOffice(name.trim(), parentId);
+        else await api.updateOffice(data.id, { name: name.trim(), divisionId: parentId || undefined });
       } else if (type === 'department') {
-        if (mode === 'create') {
-          await api.createDepartment(name.trim(), parentId);
-        } else {
-          await api.updateDepartment(data.id, { name: name.trim(), officeId: selectedParent || undefined });
-        }
+        if (mode === 'create') await api.createDepartment(name.trim(), parentId);
+        else await api.updateDepartment(data.id, { name: name.trim(), officeId: parentId || undefined });
       }
       onSaved();
     } catch (err) {
@@ -66,9 +51,7 @@ export default function OrgNodeEditModal({ type, mode, data, parentId, parentNam
     }
   };
 
-  const title = mode === 'create'
-    ? `${TYPE_LABELS[type]} 추가`
-    : `${TYPE_LABELS[type]} 수정`;
+  const title = mode === 'create' ? `${TYPE_LABELS[type]} 추가` : `${TYPE_LABELS[type]} 수정`;
 
   return (
     <div style={{
@@ -83,42 +66,32 @@ export default function OrgNodeEditModal({ type, mode, data, parentId, parentNam
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', color: textColor }}>{title}</h3>
           <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: secondaryText, cursor: 'pointer', padding: '4px',
+            background: 'none', border: 'none', color: secondaryTextColor, cursor: 'pointer', padding: '4px',
           }}>
             <X size={20} />
           </button>
         </div>
 
-        {error && (
-          <div style={{
-            padding: '10px 12px', marginBottom: '16px', borderRadius: '6px',
-            backgroundColor: isDarkMode ? '#3b1c1c' : '#fef2f2', color: '#ef4444', fontSize: '13px',
-          }}>{error}</div>
-        )}
+        <ErrorAlert message={error} />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* 상위 조직 표시 (생성 모드) */}
           {mode === 'create' && type !== 'division' && parentName && (
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: secondaryText, marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: secondaryTextColor, marginBottom: '4px' }}>
                 상위 조직
               </label>
               <input type="text" value={parentName} disabled style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
             </div>
           )}
 
-          {/* 이름 입력 */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: secondaryText, marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: secondaryTextColor, marginBottom: '4px' }}>
               {TYPE_LABELS[type]} 이름
             </label>
             <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
+              type="text" value={name} onChange={e => setName(e.target.value)}
               placeholder={`${TYPE_LABELS[type]} 이름을 입력하세요`}
-              style={inputStyle}
-              autoFocus
+              style={inputStyle} autoFocus
             />
           </div>
         </div>
@@ -131,8 +104,7 @@ export default function OrgNodeEditModal({ type, mode, data, parentId, parentNam
           <button onClick={handleSave} disabled={saving} style={{
             padding: '8px 20px', border: 'none', borderRadius: '6px',
             backgroundColor: '#3B82F6', color: '#fff',
-            cursor: saving ? 'not-allowed' : 'pointer', fontSize: '14px',
-            opacity: saving ? 0.7 : 1,
+            cursor: saving ? 'not-allowed' : 'pointer', fontSize: '14px', opacity: saving ? 0.7 : 1,
           }}>{saving ? '저장 중...' : '저장'}</button>
         </div>
       </div>

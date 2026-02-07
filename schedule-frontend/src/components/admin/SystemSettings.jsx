@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import ErrorAlert from '../common/ErrorAlert';
+import SuccessAlert from '../common/SuccessAlert';
 import { Save, RefreshCw } from 'lucide-react';
 import api from '../../utils/api';
 
@@ -48,7 +50,7 @@ const SETTING_CONFIG = {
 };
 
 export default function SystemSettings() {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, cardBg, textColor, secondaryTextColor, borderColor, inputBg } = useThemeColors();
   const [settings, setSettings] = useState({});
   const [original, setOriginal] = useState({});
   const [loading, setLoading] = useState(false);
@@ -56,11 +58,16 @@ export default function SystemSettings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const cardBg = isDarkMode ? '#283548' : '#ffffff';
-  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
-  const secondaryText = isDarkMode ? '#94a3b8' : '#64748b';
-  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
-  const inputBg = isDarkMode ? '#1e293b' : '#f8fafc';
+  const inputStyle = {
+    padding: '8px 12px',
+    border: `1px solid ${borderColor}`,
+    borderRadius: '6px',
+    backgroundColor: inputBg,
+    color: textColor,
+    fontSize: '14px',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
 
   const loadSettings = async () => {
     setLoading(true);
@@ -76,9 +83,7 @@ export default function SystemSettings() {
     }
   };
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  useEffect(() => { loadSettings(); }, []);
 
   const handleChange = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -90,7 +95,6 @@ export default function SystemSettings() {
     setError('');
     setSuccess('');
     try {
-      // 변경된 설정만 전송
       const changed = {};
       for (const key of Object.keys(settings)) {
         if (JSON.stringify(settings[key]) !== JSON.stringify(original[key])) {
@@ -122,36 +126,14 @@ export default function SystemSettings() {
 
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(original);
 
-  const inputStyle = {
-    padding: '8px 12px',
-    border: `1px solid ${borderColor}`,
-    borderRadius: '6px',
-    backgroundColor: inputBg,
-    color: textColor,
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  };
-
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '40px', color: secondaryText }}>설정 로딩 중...</div>;
+    return <div style={{ textAlign: 'center', padding: '40px', color: secondaryTextColor }}>설정 로딩 중...</div>;
   }
 
   return (
     <div>
-      {error && (
-        <div style={{
-          padding: '12px', marginBottom: '16px', borderRadius: '6px',
-          backgroundColor: isDarkMode ? '#3b1c1c' : '#fef2f2', color: '#ef4444', fontSize: '13px',
-        }}>{error}</div>
-      )}
-
-      {success && (
-        <div style={{
-          padding: '12px', marginBottom: '16px', borderRadius: '6px',
-          backgroundColor: isDarkMode ? '#1c3b2a' : '#f0fdf4', color: '#10b981', fontSize: '13px',
-        }}>{success}</div>
-      )}
+      <ErrorAlert message={error} />
+      <SuccessAlert message={success} />
 
       <div style={{
         backgroundColor: cardBg, borderRadius: '8px',
@@ -166,16 +148,13 @@ export default function SystemSettings() {
             <div key={key} style={{
               padding: '20px 24px',
               borderBottom: isLast ? 'none' : `1px solid ${borderColor}`,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '24px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '24px',
             }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: '500', color: textColor, marginBottom: '4px' }}>
                   {config.label}
                 </div>
-                <div style={{ fontSize: '12px', color: secondaryText }}>
+                <div style={{ fontSize: '12px', color: secondaryTextColor }}>
                   {config.description}
                 </div>
               </div>
@@ -184,16 +163,13 @@ export default function SystemSettings() {
                 {config.type === 'number' && (
                   <>
                     <input
-                      type="number"
-                      value={value ?? ''}
+                      type="number" value={value ?? ''}
                       onChange={e => handleChange(key, parseInt(e.target.value) || 0)}
-                      style={{ ...inputStyle, width: '80px', textAlign: 'right' }}
-                      min={0}
+                      style={{ ...inputStyle, width: '80px', textAlign: 'right' }} min={0}
                     />
-                    {config.unit && <span style={{ fontSize: '13px', color: secondaryText }}>{config.unit}</span>}
+                    {config.unit && <span style={{ fontSize: '13px', color: secondaryTextColor }}>{config.unit}</span>}
                   </>
                 )}
-
                 {config.type === 'boolean' && (
                   <button
                     onClick={() => handleChange(key, !value)}
@@ -211,7 +187,6 @@ export default function SystemSettings() {
                     }} />
                   </button>
                 )}
-
                 {config.type === 'select' && (
                   <select
                     value={value ?? ''}
@@ -229,15 +204,13 @@ export default function SystemSettings() {
         })}
       </div>
 
-      {/* 액션 버튼 */}
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '20px' }}>
         <button
-          onClick={handleReset}
-          disabled={!hasChanges}
+          onClick={handleReset} disabled={!hasChanges}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '8px 20px', border: `1px solid ${borderColor}`, borderRadius: '6px',
-            backgroundColor: 'transparent', color: hasChanges ? textColor : secondaryText,
+            backgroundColor: 'transparent', color: hasChanges ? textColor : secondaryTextColor,
             cursor: hasChanges ? 'pointer' : 'not-allowed', fontSize: '14px',
             opacity: hasChanges ? 1 : 0.5,
           }}
@@ -245,8 +218,7 @@ export default function SystemSettings() {
           <RefreshCw size={16} /> 초기화
         </button>
         <button
-          onClick={handleSave}
-          disabled={saving || !hasChanges}
+          onClick={handleSave} disabled={saving || !hasChanges}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '8px 20px', border: 'none', borderRadius: '6px',

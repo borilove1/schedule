@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { useCommonStyles } from '../../hooks/useCommonStyles';
+import ErrorAlert from '../common/ErrorAlert';
 import { Calendar, Sun, Moon } from 'lucide-react';
 
 export default function LoginPage({ onSignupClick }) {
   const { login } = useAuth();
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { toggleDarkMode } = useTheme();
+  const { isDarkMode, bgColor, cardBg, textColor, secondaryTextColor } = useThemeColors();
+  const { inputStyle, labelStyle } = useCommonStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const bgColor = isDarkMode ? '#0f172a' : '#f8fafc';
-  const cardBg = isDarkMode ? '#283548' : '#ffffff';
-  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
-  const secondaryTextColor = isDarkMode ? '#94a3b8' : '#64748b';
-  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
-  const inputBg = isDarkMode ? '#1e293b' : '#f8fafc';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,77 +80,30 @@ export default function LoginPage({ onSignupClick }) {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: textColor,
-              marginBottom: '8px'
-            }}>
-              이메일
-            </label>
+            <label style={labelStyle}>이메일</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${borderColor}`,
-                backgroundColor: inputBg,
-                color: textColor,
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
+              style={inputStyle}
               placeholder="email@example.com"
             />
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: textColor,
-              marginBottom: '8px'
-            }}>
-              비밀번호
-            </label>
+            <label style={labelStyle}>비밀번호</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${borderColor}`,
-                backgroundColor: inputBg,
-                color: textColor,
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
+              style={inputStyle}
               placeholder="••••••••"
             />
           </div>
 
-          {error && (
-            <div style={{
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
-              color: isDarkMode ? '#fca5a5' : '#dc2626',
-              fontSize: '14px',
-              marginBottom: '20px'
-            }}>
-              {error}
-            </div>
-          )}
+          <ErrorAlert message={error} />
 
           <button
             type="submit"

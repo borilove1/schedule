@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { Calendar, Sun, Moon, LogOut, Menu, X, Shield } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 
 export default function MainLayout({ children, currentPage, onNavigate }) {
   const { user, logout } = useAuth();
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { toggleDarkMode } = useTheme();
+  const { isDarkMode, bgColor, cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
+  const isMobile = useIsMobile();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [isMobile] = useState(window.innerWidth <= 768);
-
-  const bgColor = isDarkMode ? '#0f172a' : '#f8fafc';
-  const cardBg = isDarkMode ? '#283548' : '#ffffff';
-  const textColor = isDarkMode ? '#e2e8f0' : '#1e293b';
-  const borderColor = isDarkMode ? '#475569' : '#cbd5e1';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: bgColor, color: textColor }}>
@@ -56,12 +54,12 @@ export default function MainLayout({ children, currentPage, onNavigate }) {
               <div style={{ fontSize: '14px', fontWeight: '500' }}>
                 {user.division} {user.office}
               </div>
-              <div style={{ fontSize: '13px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+              <div style={{ fontSize: '13px', color: secondaryTextColor }}>
                 {user.department} {user.position} {user.name}님
               </div>
             </div>
           )}
-          
+
           <button
             onClick={toggleDarkMode}
             style={{
@@ -77,7 +75,7 @@ export default function MainLayout({ children, currentPage, onNavigate }) {
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
 
-          <NotificationBell darkMode={isDarkMode} textColor={textColor} />
+          <NotificationBell />
 
           {user && user.role === 'ADMIN' && (
             <button
@@ -126,7 +124,7 @@ export default function MainLayout({ children, currentPage, onNavigate }) {
           <div style={{ fontWeight: '500' }}>
             {user.division} {user.office}
           </div>
-          <div style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+          <div style={{ color: secondaryTextColor }}>
             {user.department} {user.position} {user.name}님
           </div>
         </div>
