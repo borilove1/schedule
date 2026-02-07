@@ -39,7 +39,7 @@ function formatEventRow(row) {
 
 /**
  * 직급별 조회 스코프 필터 생성
- * ADMIN: 전체 조회 / 본부장: 본부 내 / 처장·실장: 처 내 / 부장: 부서 내 / 그 외: 본인만
+ * ADMIN: 전체 조회 / 본부장: 본부 내 / 처장·실장: 처 내 / 사원~부장: 부서 내
  */
 function buildScopeFilter(user, startParamIdx = 1, eventAlias = 'e', userAlias = 'u') {
   if (user.role === 'ADMIN') {
@@ -51,10 +51,20 @@ function buildScopeFilter(user, startParamIdx = 1, eventAlias = 'e', userAlias =
   if (['처장', '실장'].includes(user.position) && user.officeId) {
     return { clause: `${userAlias}.office_id = $${startParamIdx}`, params: [user.officeId], nextParamIdx: startParamIdx + 1 };
   }
-  if (user.position === '부장' && user.departmentId) {
+  // 사원~부장: 같은 부서 일정 조회
+  if (user.departmentId) {
     return { clause: `${userAlias}.department_id = $${startParamIdx}`, params: [user.departmentId], nextParamIdx: startParamIdx + 1 };
   }
   return { clause: `${eventAlias}.creator_id = $${startParamIdx}`, params: [user.id], nextParamIdx: startParamIdx + 1 };
+}
+
+/**
+ * 일정 수정/삭제 권한 체크
+ */
+function canEditEvent(user, event) {
+  if (event.creator_id === user.id) return true;
+  if (user.role === 'ADMIN') return true;
+  return false;
 }
 
 /**
@@ -64,9 +74,19 @@ exports.getEvents = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const userId = req.user.id;
+    const userOfficeId = req.user.officeId;
 
     // 직급별 조회 스코프 필터
     const scope = buildScopeFilter(req.user, 1, 'e', 'u');
+
+    // 공유 처 조건 (ADMIN은 이미 전체 조회이므로 불필요)
+    let evtShareClause = '';
+    let evtShareParams = [];
+    if (req.user.role !== 'ADMIN' && userOfficeId) {
+      evtShareClause = ` OR EXISTS (SELECT 1 FROM event_shared_offices eso WHERE eso.event_id = e.id AND eso.office_id = $${scope.nextParamIdx})`;
+      evtShareParams = [userOfficeId];
+    }
+    const evtDateIdx = scope.nextParamIdx + evtShareParams.length;
 
     // 1. 일반 일정 조회 (series_id가 null인 것)
     const regularEventsQuery = `
@@ -80,12 +100,12 @@ exports.getEvents = async (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN offices o ON e.office_id = o.id
       LEFT JOIN divisions dv ON e.division_id = dv.id
-      WHERE ${scope.clause}
+      WHERE (${scope.clause}${evtShareClause})
       AND e.series_id IS NULL
-      AND e.start_at BETWEEN $${scope.nextParamIdx} AND $${scope.nextParamIdx + 1}
+      AND e.start_at BETWEEN $${evtDateIdx} AND $${evtDateIdx + 1}
       ORDER BY e.start_at
     `;
-    const regularResult = await query(regularEventsQuery, [...scope.params, startDate, endDate]);
+    const regularResult = await query(regularEventsQuery, [...scope.params, ...evtShareParams, startDate, endDate]);
     const regularEvents = regularResult.rows;
 
     // 2. 예외 일정 조회 (is_exception = true)
@@ -100,27 +120,35 @@ exports.getEvents = async (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN offices o ON e.office_id = o.id
       LEFT JOIN divisions dv ON e.division_id = dv.id
-      WHERE ${scope.clause}
+      WHERE (${scope.clause}${evtShareClause})
       AND e.is_exception = true
-      AND e.start_at BETWEEN $${scope.nextParamIdx} AND $${scope.nextParamIdx + 1}
+      AND e.start_at BETWEEN $${evtDateIdx} AND $${evtDateIdx + 1}
       ORDER BY e.start_at
     `;
-    const exceptionResult = await query(exceptionEventsQuery, [...scope.params, startDate, endDate]);
+    const exceptionResult = await query(exceptionEventsQuery, [...scope.params, ...evtShareParams, startDate, endDate]);
     const exceptionEvents = exceptionResult.rows;
 
     // 3. 반복 일정 시리즈 조회
     const seriesScope = buildScopeFilter(req.user, 1, 'es', 'u');
+    let seriesShareClause = '';
+    let seriesShareParams = [];
+    if (req.user.role !== 'ADMIN' && userOfficeId) {
+      seriesShareClause = ` OR EXISTS (SELECT 1 FROM event_shared_offices eso WHERE eso.series_id = es.id AND eso.office_id = $${seriesScope.nextParamIdx})`;
+      seriesShareParams = [userOfficeId];
+    }
+    const seriesDateIdx = seriesScope.nextParamIdx + seriesShareParams.length;
+
     const seriesQuery = `
       SELECT es.*, u.name as creator_name FROM event_series es
       JOIN users u ON es.creator_id = u.id
-      WHERE ${seriesScope.clause}
+      WHERE (${seriesScope.clause}${seriesShareClause})
       AND (
         es.recurrence_end_date IS NULL
-        OR es.recurrence_end_date >= $${seriesScope.nextParamIdx}
+        OR es.recurrence_end_date >= $${seriesDateIdx}
       )
-      AND es.first_occurrence_date <= $${seriesScope.nextParamIdx + 1}
+      AND es.first_occurrence_date <= $${seriesDateIdx + 1}
     `;
-    const seriesResult = await query(seriesQuery, [...seriesScope.params, startDate, endDate]);
+    const seriesResult = await query(seriesQuery, [...seriesScope.params, ...seriesShareParams, startDate, endDate]);
     const seriesList = seriesResult.rows;
 
     // 4. 예외 날짜 조회
@@ -155,35 +183,60 @@ exports.getEvents = async (req, res) => {
     // 7. 날짜순 정렬
     allEvents.sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
 
-    // 8. 필드명 camelCase로 변환 (프론트엔드 호환)
-    const formattedEvents = allEvents.map(event => ({
-      id: event.id,
-      title: event.title,
-      content: event.content,
-      startAt: toNaiveDateTimeString(event.start_at),
-      endAt: toNaiveDateTimeString(event.end_at),
-      status: event.status,
-      completedAt: toNaiveDateTimeString(event.completed_at),
-      alert: event.alert,
-      priority: event.priority,
-      seriesId: event.series_id,
-      occurrenceDate: event.occurrence_date,
-      isException: event.is_exception,
-      originalSeriesId: event.original_series_id,
-      isGenerated: event.is_generated,
-      // series_id가 있거나 is_recurring이 true면 반복 일정으로 표시
-      isRecurring: event.is_recurring || !!event.series_id,
-      creator: {
-        id: event.creator_id,
-        name: event.creator_name
-      },
-      isOwner: event.creator_id === userId,
-      department: event.department_name,
-      office: event.office_name,
-      division: event.division_name,
-      createdAt: toNaiveDateTimeString(event.created_at),
-      updatedAt: toNaiveDateTimeString(event.updated_at)
-    }));
+    // 8. 공유 처 정보 일괄 조회
+    const eventIds = allEvents.filter(e => !e.is_generated && e.id).map(e => e.id);
+    const allSeriesIds = [...new Set(allEvents.filter(e => e.series_id).map(e => e.series_id))];
+    let sharedMap = {};
+    if (eventIds.length > 0 || allSeriesIds.length > 0) {
+      const sharedQuery = `
+        SELECT eso.event_id, eso.series_id, eso.office_id, o.name as office_name
+        FROM event_shared_offices eso
+        JOIN offices o ON eso.office_id = o.id
+        WHERE eso.event_id = ANY($1) OR eso.series_id = ANY($2)
+      `;
+      const sharedResult = await query(sharedQuery, [eventIds, allSeriesIds]);
+      for (const row of sharedResult.rows) {
+        const key = row.event_id ? `event_${row.event_id}` : `series_${row.series_id}`;
+        if (!sharedMap[key]) sharedMap[key] = [];
+        sharedMap[key].push({ id: row.office_id, name: row.office_name });
+      }
+    }
+
+    // 9. 필드명 camelCase로 변환 (프론트엔드 호환)
+    const formattedEvents = allEvents.map(event => {
+      const sharedOffices = sharedMap[`event_${event.id}`]
+        || sharedMap[`series_${event.series_id}`]
+        || [];
+      return {
+        id: event.id,
+        title: event.title,
+        content: event.content,
+        startAt: toNaiveDateTimeString(event.start_at),
+        endAt: toNaiveDateTimeString(event.end_at),
+        status: event.status,
+        completedAt: toNaiveDateTimeString(event.completed_at),
+        alert: event.alert,
+        priority: event.priority,
+        seriesId: event.series_id,
+        occurrenceDate: event.occurrence_date,
+        isException: event.is_exception,
+        originalSeriesId: event.original_series_id,
+        isGenerated: event.is_generated,
+        isRecurring: event.is_recurring || !!event.series_id,
+        creator: {
+          id: event.creator_id,
+          name: event.creator_name
+        },
+        isOwner: event.creator_id === userId,
+        canEdit: event.creator_id === userId || req.user.role === 'ADMIN',
+        department: event.department_name,
+        office: event.office_name,
+        division: event.division_name,
+        sharedOffices,
+        createdAt: toNaiveDateTimeString(event.created_at),
+        updatedAt: toNaiveDateTimeString(event.updated_at)
+      };
+    });
 
     res.json({
       success: true,
@@ -200,14 +253,15 @@ exports.getEvents = async (req, res) => {
  */
 exports.createEvent = async (req, res) => {
   try {
-    const { 
-      title, content, 
+    const {
+      title, content,
       start_at, end_at, startAt, endAt,  // 둘 다 받기
       status, alert,
       is_recurring, isRecurring,  // 둘 다 받기
       recurrence_type, recurrenceType,  // 둘 다 받기
       recurrence_interval, recurrenceInterval,  // 둘 다 받기
-      recurrence_end_date, recurrenceEndDate  // 둘 다 받기
+      recurrence_end_date, recurrenceEndDate,  // 둘 다 받기
+      sharedOfficeIds  // 공유 처 ID 배열
     } = req.body;
     
     // camelCase 우선, snake_case 대체
@@ -262,6 +316,18 @@ exports.createEvent = async (req, res) => {
         ];
 
         const seriesResult = await client.query(seriesQuery, seriesValues);
+        const newSeries = seriesResult.rows[0];
+
+        // 공유 처 저장
+        if (sharedOfficeIds && sharedOfficeIds.length > 0) {
+          for (const officeId of sharedOfficeIds) {
+            await client.query(
+              'INSERT INTO event_shared_offices (series_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [newSeries.id, officeId]
+            );
+          }
+        }
+
         return seriesResult;
       });
 
@@ -270,26 +336,41 @@ exports.createEvent = async (req, res) => {
         data: { series: result.rows[0] }
       });
     } else {
-      // 일반 일정 생성
-      const eventQuery = `
-        INSERT INTO events (
-          title, content, start_at, end_at, status, alert,
-          creator_id, department_id, office_id, division_id
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING *
-      `;
-      
-      const eventValues = [
-        title, content, actualStartAt, actualEndAt, status || 'PENDING', alert || 'none',
-        userId, user.department_id, user.office_id, user.division_id
-      ];
+      // 일반 일정 생성 (트랜잭션으로 공유 처 함께 저장)
+      const result = await transaction(async (client) => {
+        const eventQuery = `
+          INSERT INTO events (
+            title, content, start_at, end_at, status, alert,
+            creator_id, department_id, office_id, division_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
 
-      const eventResult = await query(eventQuery, eventValues);
+        const eventValues = [
+          title, content, actualStartAt, actualEndAt, status || 'PENDING', alert || 'none',
+          userId, user.department_id, user.office_id, user.division_id
+        ];
+
+        const eventResult = await client.query(eventQuery, eventValues);
+        const newEvent = eventResult.rows[0];
+
+        // 공유 처 저장
+        if (sharedOfficeIds && sharedOfficeIds.length > 0) {
+          for (const officeId of sharedOfficeIds) {
+            await client.query(
+              'INSERT INTO event_shared_offices (event_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [newEvent.id, officeId]
+            );
+          }
+        }
+
+        return eventResult;
+      });
 
       res.status(201).json({
         success: true,
-        data: { event: formatEventRow(eventResult.rows[0]) }
+        data: { event: formatEventRow(result.rows[0]) }
       });
     }
   } catch (error) {
@@ -313,7 +394,8 @@ exports.updateEvent = async (req, res) => {
       status, edit_type, editType, occurrence_date, occurrenceDate,
       recurrence_type, recurrenceType: recurrenceTypeField,
       recurrence_interval, recurrenceInterval: recurrenceIntervalField,
-      recurrence_end_date, recurrenceEndDate: recurrenceEndDateField
+      recurrence_end_date, recurrenceEndDate: recurrenceEndDateField,
+      sharedOfficeIds
     } = req.body;
 
     const actualStartAt = startAt || start_at;
@@ -340,14 +422,17 @@ exports.updateEvent = async (req, res) => {
       const seriesEditType = actualEditType || 'this';
 
       // event_series 조회
-      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1 AND creator_id = $2';
-      const seriesResult = await query(seriesQuery, [seriesId, userId]);
+      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1';
+      const seriesResult = await query(seriesQuery, [seriesId]);
 
       if (seriesResult.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'Event series not found' });
       }
 
       const series = seriesResult.rows[0];
+      if (!canEditEvent(req.user, series)) {
+        return res.status(403).json({ success: false, message: '수정 권한이 없습니다.' });
+      }
 
       if (seriesEditType === 'this') {
         // 이 날짜만 수정 - 시리즈에서 분리하여 독립 이벤트 생성
@@ -374,6 +459,13 @@ exports.updateEvent = async (req, res) => {
           ];
 
           const insertResult = await client.query(insertQuery, values);
+          const newEvent = insertResult.rows[0];
+
+          // 시리즈 공유 처 복사
+          const sharedRows = await client.query('SELECT office_id FROM event_shared_offices WHERE series_id = $1', [seriesId]);
+          for (const row of sharedRows.rows) {
+            await client.query('INSERT INTO event_shared_offices (event_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [newEvent.id, row.office_id]);
+          }
 
           // 원래 반복 일정에서 이 날짜 제외
           const exceptionQuery = `
@@ -452,15 +544,27 @@ exports.updateEvent = async (req, res) => {
         }
 
         values.push(seriesId);
-        values.push(userId);
 
         const updateQuery = `
           UPDATE event_series
           SET ${setClauses.join(', ')}
-          WHERE id = $${paramIndex++} AND creator_id = $${paramIndex++}
+          WHERE id = $${paramIndex++}
           RETURNING *
         `;
-        const result = await query(updateQuery, values);
+
+        // 공유 처 업데이트 (트랜잭션)
+        const result = await transaction(async (client) => {
+          const updateResult = await client.query(updateQuery, values);
+
+          if (sharedOfficeIds !== undefined) {
+            await client.query('DELETE FROM event_shared_offices WHERE series_id = $1', [seriesId]);
+            for (const officeId of (sharedOfficeIds || [])) {
+              await client.query('INSERT INTO event_shared_offices (series_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [seriesId, officeId]);
+            }
+          }
+
+          return updateResult;
+        });
 
         const updatedSeries = result.rows[0];
 
@@ -482,14 +586,17 @@ exports.updateEvent = async (req, res) => {
     }
 
     // 일반 일정인 경우 - 원본 이벤트 조회
-    const originalQuery = 'SELECT * FROM events WHERE id = $1 AND creator_id = $2';
-    const originalResult = await query(originalQuery, [id, userId]);
+    const originalQuery = 'SELECT * FROM events WHERE id = $1';
+    const originalResult = await query(originalQuery, [id]);
 
     if (originalResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
     const originalEvent = originalResult.rows[0];
+    if (!canEditEvent(req.user, originalEvent)) {
+      return res.status(403).json({ success: false, message: '수정 권한이 없습니다.' });
+    }
 
     // 반복 일정 수정
     if (originalEvent.series_id && actualEditType === 'this') {
@@ -545,10 +652,10 @@ exports.updateEvent = async (req, res) => {
       const updateQuery = `
         UPDATE event_series
         SET title = $1, content = $2, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $3 AND creator_id = $4
+        WHERE id = $3
         RETURNING *
       `;
-      const result = await query(updateQuery, [title, content, originalEvent.series_id, userId]);
+      const result = await query(updateQuery, [title, content, originalEvent.series_id]);
 
       const updatedSeries = result.rows[0];
 
@@ -567,14 +674,25 @@ exports.updateEvent = async (req, res) => {
 
       return res.json({ success: true, data: { series: updatedSeries } });
     } else {
-      // 일반 일정 수정
-      const updateQuery = `
-        UPDATE events
-        SET title = $1, content = $2, start_at = $3, end_at = $4, status = $5, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6 AND creator_id = $7
-        RETURNING *
-      `;
-      const result = await query(updateQuery, [title, content, actualStartAt, actualEndAt, status || originalEvent.status, id, userId]);
+      // 일반 일정 수정 (공유 처 업데이트 포함)
+      const result = await transaction(async (client) => {
+        const updateQuery = `
+          UPDATE events
+          SET title = $1, content = $2, start_at = $3, end_at = $4, status = $5, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $6
+          RETURNING *
+        `;
+        const updateResult = await client.query(updateQuery, [title, content, actualStartAt, actualEndAt, status || originalEvent.status, id]);
+
+        if (sharedOfficeIds !== undefined) {
+          await client.query('DELETE FROM event_shared_offices WHERE event_id = $1', [id]);
+          for (const officeId of (sharedOfficeIds || [])) {
+            await client.query('INSERT INTO event_shared_offices (event_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, officeId]);
+          }
+        }
+
+        return updateResult;
+      });
 
       const updatedEvent = result.rows[0];
 
@@ -622,17 +740,20 @@ exports.deleteEvent = async (req, res) => {
       const occurrenceTimestamp = parts[2];
 
       // event_series 조회
-      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1 AND creator_id = $2';
-      const seriesResult = await query(seriesQuery, [seriesId, userId]);
+      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1';
+      const seriesResult = await query(seriesQuery, [seriesId]);
 
       if (seriesResult.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'Event series not found' });
       }
 
+      const series = seriesResult.rows[0];
+      if (!canEditEvent(req.user, series)) {
+        return res.status(403).json({ success: false, message: '삭제 권한이 없습니다.' });
+      }
+
       const occurrenceDate = new Date(parseInt(occurrenceTimestamp));
       const occurrenceDateStr = occurrenceDate.toISOString().split('T')[0];
-
-      const series = seriesResult.rows[0];
 
       if (actualDeleteType === 'single') {
         // 이 날짜만 삭제 - 예외 추가
@@ -658,10 +779,9 @@ exports.deleteEvent = async (req, res) => {
 
         return res.json({ success: true, message: 'Event occurrence deleted' });
       } else if (actualDeleteType === 'series') {
-        // 전체 반복 일정 삭제
+        // 전체 반복 일정 삭제 (CASCADE로 event_shared_offices 자동 삭제)
         await transaction(async (client) => {
-          const deleteSeriesQuery = 'DELETE FROM event_series WHERE id = $1 AND creator_id = $2';
-          await client.query(deleteSeriesQuery, [seriesId, userId]);
+          await client.query('DELETE FROM event_series WHERE id = $1', [seriesId]);
         });
 
         // 알림 생성
@@ -682,14 +802,17 @@ exports.deleteEvent = async (req, res) => {
     }
 
     // 일반 일정인 경우
-    const originalQuery = 'SELECT * FROM events WHERE id = $1 AND creator_id = $2';
-    const originalResult = await query(originalQuery, [id, userId]);
+    const originalQuery = 'SELECT * FROM events WHERE id = $1';
+    const originalResult = await query(originalQuery, [id]);
 
     if (originalResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
     const originalEvent = originalResult.rows[0];
+    if (!canEditEvent(req.user, originalEvent)) {
+      return res.status(403).json({ success: false, message: '삭제 권한이 없습니다.' });
+    }
 
     // 반복 일정의 예외 이벤트 삭제
     if (originalEvent.series_id && actualDeleteType === 'single') {
@@ -718,8 +841,7 @@ exports.deleteEvent = async (req, res) => {
     } else if (originalEvent.series_id && actualDeleteType === 'series') {
       // 전체 반복 일정 삭제
       await transaction(async (client) => {
-        const deleteSeriesQuery = 'DELETE FROM event_series WHERE id = $1 AND creator_id = $2';
-        await client.query(deleteSeriesQuery, [originalEvent.series_id, userId]);
+        await client.query('DELETE FROM event_series WHERE id = $1', [originalEvent.series_id]);
       });
 
       // 알림 생성
@@ -740,8 +862,7 @@ exports.deleteEvent = async (req, res) => {
       // 일반 일정 삭제
       const eventTitle = originalEvent.title;
 
-      const deleteQuery = 'DELETE FROM events WHERE id = $1 AND creator_id = $2';
-      await query(deleteQuery, [id, userId]);
+      await query('DELETE FROM events WHERE id = $1', [id]);
 
       // 알림 생성
       try {
@@ -778,8 +899,14 @@ exports.getEventById = async (req, res) => {
       const seriesId = parts[1];
       const occurrenceTimestamp = parts[2];
       
-      // event_series 조회 (직급별 스코프 적용)
+      // event_series 조회 (직급별 스코프 + 공유 처 적용)
       const detailScope = buildScopeFilter(req.user, 2, 'es', 'u');
+      let detailShareClause = '';
+      let detailShareParams = [];
+      if (req.user.role !== 'ADMIN' && req.user.officeId) {
+        detailShareClause = ` OR EXISTS (SELECT 1 FROM event_shared_offices eso WHERE eso.series_id = es.id AND eso.office_id = $${detailScope.nextParamIdx})`;
+        detailShareParams = [req.user.officeId];
+      }
       const seriesQuery = `
         SELECT es.*,
                u.name as creator_name,
@@ -791,10 +918,10 @@ exports.getEventById = async (req, res) => {
         LEFT JOIN departments d ON es.department_id = d.id
         LEFT JOIN offices o ON es.office_id = o.id
         LEFT JOIN divisions dv ON es.division_id = dv.id
-        WHERE es.id = $1 AND (${detailScope.clause})
+        WHERE es.id = $1 AND (${detailScope.clause}${detailShareClause})
       `;
 
-      const result = await query(seriesQuery, [seriesId, ...detailScope.params]);
+      const result = await query(seriesQuery, [seriesId, ...detailScope.params, ...detailShareParams]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'Event series not found' });
@@ -830,6 +957,13 @@ exports.getEventById = async (req, res) => {
       const startTimeStr = series.start_time.substring(0, 5); // 'HH:MM'
       const endTimeStr = series.end_time.substring(0, 5);
 
+      // 공유 처 정보 조회
+      const seriesSharedResult = await query(
+        'SELECT eso.office_id, o.name as office_name FROM event_shared_offices eso JOIN offices o ON eso.office_id = o.id WHERE eso.series_id = $1',
+        [series.id]
+      );
+      const seriesSharedOffices = seriesSharedResult.rows.map(r => ({ id: r.office_id, name: r.office_name }));
+
       // 필드명 camelCase로 변환
       const formattedEvent = {
         id: id,
@@ -853,9 +987,11 @@ exports.getEventById = async (req, res) => {
           name: series.creator_name
         },
         isOwner: series.creator_id === req.user.id,
+        canEdit: canEditEvent(req.user, series),
         department: series.department_name,
         office: series.office_name,
         division: series.division_name,
+        sharedOffices: seriesSharedOffices,
         createdAt: series.created_at,
         updatedAt: series.updated_at
       };
@@ -866,8 +1002,14 @@ exports.getEventById = async (req, res) => {
       });
     }
 
-    // 일반 일정인 경우 (직급별 스코프 적용)
+    // 일반 일정인 경우 (직급별 스코프 + 공유 처 적용)
     const eventScope = buildScopeFilter(req.user, 2, 'e', 'u');
+    let eventShareClause = '';
+    let eventShareParams = [];
+    if (req.user.role !== 'ADMIN' && req.user.officeId) {
+      eventShareClause = ` OR EXISTS (SELECT 1 FROM event_shared_offices eso WHERE eso.event_id = e.id AND eso.office_id = $${eventScope.nextParamIdx})`;
+      eventShareParams = [req.user.officeId];
+    }
     const eventQuery = `
       SELECT e.*,
              u.name as creator_name,
@@ -879,16 +1021,24 @@ exports.getEventById = async (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN offices o ON e.office_id = o.id
       LEFT JOIN divisions dv ON e.division_id = dv.id
-      WHERE e.id = $1 AND (${eventScope.clause})
+      WHERE e.id = $1 AND (${eventScope.clause}${eventShareClause})
     `;
 
-    const result = await query(eventQuery, [id, ...eventScope.params]);
+    const result = await query(eventQuery, [id, ...eventScope.params, ...eventShareParams]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
     const event = result.rows[0];
+
+    // 공유 처 정보 조회
+    const eventSharedResult = await query(
+      `SELECT eso.office_id, o.name as office_name FROM event_shared_offices eso JOIN offices o ON eso.office_id = o.id
+       WHERE eso.event_id = $1 OR (eso.series_id = $2 AND $2 IS NOT NULL)`,
+      [event.id, event.series_id]
+    );
+    const eventSharedOffices = eventSharedResult.rows.map(r => ({ id: r.office_id, name: r.office_name }));
 
     // 필드명 camelCase로 변환
     const formattedEvent = {
@@ -910,9 +1060,11 @@ exports.getEventById = async (req, res) => {
         name: event.creator_name
       },
       isOwner: event.creator_id === req.user.id,
+      canEdit: canEditEvent(req.user, event),
       department: event.department_name,
       office: event.office_name,
       division: event.division_name,
+      sharedOffices: eventSharedOffices,
       createdAt: toNaiveDateTimeString(event.created_at),
       updatedAt: toNaiveDateTimeString(event.updated_at)
     };
@@ -943,31 +1095,32 @@ exports.completeEvent = async (req, res) => {
       const occurrenceTimestamp = parts[2];
 
       // event_series 조회
-      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1 AND creator_id = $2';
-      const seriesResult = await query(seriesQuery, [seriesId, userId]);
+      const seriesQuery = 'SELECT * FROM event_series WHERE id = $1';
+      const seriesResult = await query(seriesQuery, [seriesId]);
 
       if (seriesResult.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'Event series not found' });
       }
 
       const series = seriesResult.rows[0];
+      if (!canEditEvent(req.user, series)) {
+        return res.status(403).json({ success: false, message: '권한이 없습니다.' });
+      }
       const occurrenceDate = new Date(parseInt(occurrenceTimestamp));
       const occurrenceDateStr = occurrenceDate.toISOString().split('T')[0];
 
       // 전체 완료: 시리즈 상태를 DONE으로 변경 + 기존 예외 이벤트도 DONE으로
       if (completeType === 'all') {
         await transaction(async (client) => {
-          // 시리즈 상태를 DONE으로 변경
           await client.query(
             `UPDATE event_series SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1 AND creator_id = $2`,
-            [seriesId, userId]
+             WHERE id = $1`,
+            [seriesId]
           );
-          // 시리즈에 속한 기존 예외 이벤트도 DONE으로 변경
           await client.query(
             `UPDATE events SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-             WHERE series_id = $1 AND creator_id = $2 AND status != 'DONE'`,
-            [seriesId, userId]
+             WHERE series_id = $1 AND status != 'DONE'`,
+            [seriesId]
           );
         });
 
@@ -1016,6 +1169,13 @@ exports.completeEvent = async (req, res) => {
         ];
 
         const insertResult = await client.query(insertQuery, values);
+        const newEvent = insertResult.rows[0];
+
+        // 시리즈 공유 처 복사
+        const sharedRows = await client.query('SELECT office_id FROM event_shared_offices WHERE series_id = $1', [seriesId]);
+        for (const row of sharedRows.rows) {
+          await client.query('INSERT INTO event_shared_offices (event_id, office_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [newEvent.id, row.office_id]);
+        }
 
         // event_exceptions에 추가 (이 날짜는 원래 반복 일정에서 제외)
         const exceptionQuery = `
@@ -1049,19 +1209,23 @@ exports.completeEvent = async (req, res) => {
       });
     }
 
-    // 일반 일정인 경우
-    const updateQuery = `
-      UPDATE events
-      SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 AND creator_id = $2
-      RETURNING *
-    `;
-    const result = await query(updateQuery, [id, userId]);
-
-    if (result.rows.length === 0) {
+    // 일반 일정인 경우 - 권한 체크 후 완료
+    const checkQuery = 'SELECT * FROM events WHERE id = $1';
+    const checkResult = await query(checkQuery, [id]);
+    if (checkResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
+    if (!canEditEvent(req.user, checkResult.rows[0])) {
+      return res.status(403).json({ success: false, message: '권한이 없습니다.' });
+    }
 
+    const completeQuery = `
+      UPDATE events
+      SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+    const result = await query(completeQuery, [id]);
     const completedEvent = result.rows[0];
 
     // 알림 생성
@@ -1105,21 +1269,27 @@ exports.uncompleteEvent = async (req, res) => {
       const occurrenceDateStr = occurrenceDate.toISOString().split('T')[0];
 
       // 시리즈 조회하여 전체 완료 상태인지 확인
-      const seriesCheck = await query('SELECT status FROM event_series WHERE id = $1 AND creator_id = $2', [seriesId, userId]);
+      const seriesCheck = await query('SELECT * FROM event_series WHERE id = $1', [seriesId]);
 
-      if (seriesCheck.rows.length > 0 && seriesCheck.rows[0].status === 'DONE') {
+      if (seriesCheck.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Event series not found' });
+      }
+      if (!canEditEvent(req.user, seriesCheck.rows[0])) {
+        return res.status(403).json({ success: false, message: '권한이 없습니다.' });
+      }
+
+      if (seriesCheck.rows[0].status === 'DONE') {
         // 전체 완료된 시리즈 → 전체를 PENDING으로 되돌림
         await transaction(async (client) => {
           await client.query(
             `UPDATE event_series SET status = 'PENDING', completed_at = NULL, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1 AND creator_id = $2`,
-            [seriesId, userId]
+             WHERE id = $1`,
+            [seriesId]
           );
-          // 시리즈에 속한 기존 예외 이벤트도 PENDING으로 되돌림
           await client.query(
             `UPDATE events SET status = 'PENDING', completed_at = NULL, updated_at = CURRENT_TIMESTAMP
-             WHERE series_id = $1 AND creator_id = $2 AND status = 'DONE'`,
-            [seriesId, userId]
+             WHERE series_id = $1 AND status = 'DONE'`,
+            [seriesId]
           );
         });
 
@@ -1131,22 +1301,16 @@ exports.uncompleteEvent = async (req, res) => {
 
       // 개별 완료된 예외 이벤트 삭제
       await transaction(async (client) => {
-        // events 테이블에서 이 날짜의 완료 예외 삭제
-        const deleteEventQuery = `
-          DELETE FROM events
-          WHERE series_id = $1
-          AND is_exception = true
-          AND DATE(start_at) = $2
-          AND creator_id = $3
-        `;
-        await client.query(deleteEventQuery, [seriesId, occurrenceDateStr, userId]);
+        await client.query(
+          `DELETE FROM events
+           WHERE series_id = $1 AND is_exception = true AND DATE(start_at) = $2`,
+          [seriesId, occurrenceDateStr]
+        );
 
-        // event_exceptions에서 제거 (다시 반복 일정에 포함)
-        const deleteExceptionQuery = `
-          DELETE FROM event_exceptions
-          WHERE series_id = $1 AND exception_date = $2
-        `;
-        await client.query(deleteExceptionQuery, [seriesId, occurrenceDateStr]);
+        await client.query(
+          `DELETE FROM event_exceptions WHERE series_id = $1 AND exception_date = $2`,
+          [seriesId, occurrenceDateStr]
+        );
       });
 
       return res.json({
@@ -1155,18 +1319,19 @@ exports.uncompleteEvent = async (req, res) => {
       });
     }
 
-    // 일반 일정인 경우
-    const updateQuery = `
-      UPDATE events
-      SET status = 'PENDING', completed_at = NULL, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 AND creator_id = $2
-      RETURNING *
-    `;
-    const result = await query(updateQuery, [id, userId]);
-
-    if (result.rows.length === 0) {
+    // 일반 일정인 경우 - 권한 체크
+    const uncompleteCheck = await query('SELECT * FROM events WHERE id = $1', [id]);
+    if (uncompleteCheck.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
+    if (!canEditEvent(req.user, uncompleteCheck.rows[0])) {
+      return res.status(403).json({ success: false, message: '권한이 없습니다.' });
+    }
+
+    const result = await query(
+      `UPDATE events SET status = 'PENDING', completed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+      [id]
+    );
 
     res.json({
       success: true,

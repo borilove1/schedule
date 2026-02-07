@@ -24,6 +24,8 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
   const [error, setError] = useState('');
   const [activeDialog, setActiveDialog] = useState(null);
   const [editType, setEditType] = useState('this');
+  const [offices, setOffices] = useState([]);
+  const [selectedOfficeIds, setSelectedOfficeIds] = useState([]);
   const [formData, setFormData] = useState({
     title: '', content: '',
     startDate: '', startTime: '', endDate: '', endTime: '',
@@ -36,8 +38,15 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
       setError('');
       setActiveDialog(null);
       setEditType('this');
+      setSelectedOfficeIds([]);
       actionGuard.reset();
       loadEvent();
+      if (currentUser?.divisionId) {
+        api.getOffices(currentUser.divisionId).then(data => {
+          const list = data?.offices || data || [];
+          setOffices(Array.isArray(list) ? list : []);
+        }).catch(() => {});
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, eventId]);
@@ -63,6 +72,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
           recurrenceEndDate: data.recurrenceEndDate
             ? new Date(data.recurrenceEndDate).toISOString().split('T')[0] : ''
         });
+        if (data.sharedOffices && Array.isArray(data.sharedOffices)) {
+          setSelectedOfficeIds(data.sharedOffices.map(o => o.id || o.officeId || o.office_id));
+        }
       } else {
         setError('일정 데이터를 불러올 수 없습니다.');
       }
@@ -95,6 +107,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         }
 
         const updateData = { title: formData.title, content: formData.content, startAt, endAt, priority: 'NORMAL' };
+        updateData.sharedOfficeIds = selectedOfficeIds;
         if (eventId && String(eventId).startsWith('series-')) {
           updateData.editType = editType;
           if (editType === 'all') {
@@ -243,6 +256,11 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                 loading={loading}
                 actionInProgress={actionGuard.inProgress}
                 error={error}
+                offices={offices}
+                selectedOfficeIds={selectedOfficeIds}
+                onOfficeToggle={(officeId) => setSelectedOfficeIds(prev =>
+                  prev.includes(officeId) ? prev.filter(id => id !== officeId) : [...prev, officeId]
+                )}
               />
             )}
           </div>

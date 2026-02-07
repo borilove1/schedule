@@ -141,6 +141,20 @@ const EventList = React.memo(function EventList({
                         {event.creator.name}
                       </span>
                     )}
+                    {event.sharedOffices && event.sharedOffices.length > 0 && (
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        backgroundColor: isDarkMode ? '#3b2f63' : '#ede9fe',
+                        color: isDarkMode ? '#c4b5fd' : '#7c3aed',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}>
+                        공유
+                      </span>
+                    )}
                   </div>
                   <div style={{
                     fontSize: '11px',

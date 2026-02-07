@@ -137,6 +137,9 @@ router.post('/register',
           division: division,
           office: office,
           department: department,
+          divisionId: division_id,
+          officeId: office_id,
+          departmentId: department_id,
           role: user.role
         }
       });
@@ -173,6 +176,7 @@ router.post('/login',
       const result = await query(
         `SELECT
           u.id, u.email, u.password_hash, u.name, u.position, u.role,
+          u.division_id, u.office_id, u.department_id,
           d.name as division,
           o.name as office,
           dept.name as department
@@ -223,6 +227,9 @@ router.post('/login',
           division: user.division,
           office: user.office,
           department: user.department,
+          divisionId: user.division_id,
+          officeId: user.office_id,
+          departmentId: user.department_id,
           role: user.role
         }
       });
@@ -246,8 +253,9 @@ router.post('/logout', authenticate, async (req, res) => {
 router.get('/me', authenticate, async (req, res, next) => {
   try {
     const result = await query(
-      `SELECT 
+      `SELECT
         u.id, u.email, u.name, u.position, u.role,
+        u.division_id, u.office_id, u.department_id,
         d.name as division,
         o.name as office,
         dept.name as department
@@ -275,6 +283,9 @@ router.get('/me', authenticate, async (req, res, next) => {
         division: user.division,
         office: user.office,
         department: user.department,
+        divisionId: user.division_id,
+        officeId: user.office_id,
+        departmentId: user.department_id,
         role: user.role
       }
     });

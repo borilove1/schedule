@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Share2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
@@ -32,8 +32,10 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
   const [formData, setFormData] = useState(() => getInitialFormData(selectedDate));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [offices, setOffices] = useState([]);
+  const [selectedOfficeIds, setSelectedOfficeIds] = useState([]);
 
-  const { bgColor, cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
+  const { isDarkMode, bgColor, cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
   const { fontFamily, inputStyle, labelStyle } = useCommonStyles();
 
   useEffect(() => {
@@ -41,13 +43,27 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
       setFormData(getInitialFormData(selectedDate));
       setError('');
       setLoading(false);
+      setSelectedOfficeIds([]);
+      // 처/실 목록 로드
+      if (user?.divisionId) {
+        api.getOffices(user.divisionId).then(data => {
+          const list = data?.offices || data || [];
+          setOffices(Array.isArray(list) ? list : []);
+        }).catch(() => {});
+      }
     }
-  }, [isOpen, selectedDate]);
+  }, [isOpen, selectedDate, user?.divisionId]);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const toggleOffice = (officeId) => {
+    setSelectedOfficeIds(prev =>
+      prev.includes(officeId) ? prev.filter(id => id !== officeId) : [...prev, officeId]
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -72,6 +88,10 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
         endAt,
         priority: formData.priority
       };
+
+      if (selectedOfficeIds.length > 0) {
+        eventData.sharedOfficeIds = selectedOfficeIds;
+      }
 
       if (formData.isRecurring) {
         eventData.isRecurring = true;
@@ -165,6 +185,39 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
               <option value="HIGH">높음</option>
             </select>
           </div>
+
+          {/* 일정 공유 */}
+          {offices.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Share2 size={14} /> 일정 공유 (선택사항)
+              </label>
+              <div style={{
+                padding: '12px', borderRadius: '8px', border: `1px solid ${borderColor}`,
+                backgroundColor: bgColor, maxHeight: '150px', overflowY: 'auto'
+              }}>
+                {offices.map(office => (
+                  <label key={office.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 4px',
+                    cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedOfficeIds.includes(office.id)}
+                      onChange={() => toggleOffice(office.id)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3B82F6' }}
+                    />
+                    {office.name}
+                  </label>
+                ))}
+              </div>
+              <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily }}>
+                {selectedOfficeIds.length > 0
+                  ? `${selectedOfficeIds.length}개 처/실 소속 전원이 이 일정을 볼 수 있습니다.`
+                  : '같은 부서원은 항상 볼 수 있습니다. 다른 처/실과 공유하려면 선택하세요.'}
+              </p>
+            </div>
+          )}
 
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontFamily }}>

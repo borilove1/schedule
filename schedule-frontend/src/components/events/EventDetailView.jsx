@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, Check, Calendar, Clock, User, Repeat, Eye } from 'lucide-react';
+import { Edit2, Trash2, Check, Calendar, Clock, User, Repeat, Eye, Users } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { getStatusColor, getStatusText, getRecurrenceDescription } from '../../utils/eventHelpers';
 import ErrorAlert from '../common/ErrorAlert';
@@ -12,6 +12,7 @@ export default function EventDetailView({
   const { isDarkMode, textColor, secondaryTextColor, inputBg } = useThemeColors();
 
   const isOwner = event.isOwner ?? (event.creator?.id === currentUser?.id);
+  const canEdit = event.canEdit ?? isOwner;
   const recurrenceDesc = getRecurrenceDescription(event);
 
   return (
@@ -23,7 +24,7 @@ export default function EventDetailView({
         }}>
           {getStatusText(event.status)}
         </div>
-        {!isOwner && (
+        {!canEdit && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '4px',
             padding: '6px 12px', borderRadius: '6px',
@@ -71,6 +72,12 @@ export default function EventDetailView({
             <Repeat size={16} /><span>{recurrenceDesc}</span>
           </div>
         )}
+        {event.sharedOffices && event.sharedOffices.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6', fontSize: '14px', marginTop: '8px' }}>
+            <Users size={16} />
+            <span>공유: {event.sharedOffices.map(o => o.name || o.officeName || o.office_name).join(', ')}</span>
+          </div>
+        )}
       </div>
 
       <ErrorAlert message={error} />
@@ -84,7 +91,7 @@ export default function EventDetailView({
         </div>
       )}
 
-      {isOwner ? (
+      {canEdit ? (
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <button
             onClick={onComplete}

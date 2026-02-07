@@ -1,12 +1,14 @@
 import React from 'react';
+import { Share2 } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
 import ErrorAlert from '../common/ErrorAlert';
 
 export default function EventEditForm({
-  formData, onChange, onSubmit, onCancel, editType, event, loading, actionInProgress, error
+  formData, onChange, onSubmit, onCancel, editType, event, loading, actionInProgress, error,
+  offices = [], selectedOfficeIds = [], onOfficeToggle
 }) {
-  const { inputBg, borderColor, textColor } = useThemeColors();
+  const { inputBg, borderColor, textColor, bgColor, secondaryTextColor } = useThemeColors();
   const { inputStyle, labelStyle, fontFamily } = useCommonStyles();
 
   return (
@@ -71,6 +73,38 @@ export default function EventEditForm({
               onChange={onChange} style={{ ...inputStyle, boxSizing: 'border-box' }}
             />
           </div>
+        </div>
+      )}
+
+      {offices.length > 0 && onOfficeToggle && (
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Share2 size={14} /> 일정 공유 (선택사항)
+          </label>
+          <div style={{
+            padding: '12px', borderRadius: '8px', border: `1px solid ${borderColor}`,
+            backgroundColor: bgColor, maxHeight: '150px', overflowY: 'auto'
+          }}>
+            {offices.map(office => (
+              <label key={office.id} style={{
+                display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 4px',
+                cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor
+              }}>
+                <input
+                  type="checkbox"
+                  checked={selectedOfficeIds.includes(office.id)}
+                  onChange={() => onOfficeToggle(office.id)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3B82F6' }}
+                />
+                {office.name}
+              </label>
+            ))}
+          </div>
+          <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily }}>
+            {selectedOfficeIds.length > 0
+              ? `${selectedOfficeIds.length}개 처/실 소속 전원이 이 일정을 볼 수 있습니다.`
+              : '같은 부서원은 항상 볼 수 있습니다. 다른 처/실과 공유하려면 선택하세요.'}
+          </p>
         </div>
       )}
 
