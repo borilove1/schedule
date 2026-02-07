@@ -61,7 +61,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(userData),
     });
-    this.setToken(data.token);
+    // 관리자 승인 필요 - 토큰 저장하지 않음
     return data;
   }
 
@@ -148,6 +148,16 @@ class ApiClient {
     return this.request(`/users/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async approveUser(id) {
+    return this.request(`/users/${id}/approve`, {
+      method: 'PATCH',
+    });
+  }
+
+  async getPendingApprovalCount() {
+    return this.request('/users/pending-count');
   }
 
   // ========== 조직 관리 (Admin) ==========

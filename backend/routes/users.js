@@ -2,6 +2,7 @@ const express = require('express');
 const { query } = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
+const { createNotification } = require('../src/controllers/notificationController');
 
 const router = express.Router();
 
@@ -84,6 +85,7 @@ router.get('/', authorize('ADMIN'), async (req, res, next) => {
         o.name AS office,
         div.name AS division,
         u.is_active,
+        u.approved_at,
         u.last_login_at,
         u.created_at
       FROM users u
@@ -106,6 +108,21 @@ router.get('/', authorize('ADMIN'), async (req, res, next) => {
           totalPages: Math.ceil(total / limit)
         }
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 승인 대기 사용자 수 ==========
+router.get('/pending-count', authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const result = await query(
+      'SELECT COUNT(*) as count FROM users WHERE is_active = false AND approved_at IS NULL'
+    );
+    res.json({
+      success: true,
+      data: { count: parseInt(result.rows[0].count) }
     });
   } catch (error) {
     next(error);
@@ -140,6 +157,7 @@ router.get('/:id', async (req, res, next) => {
         o.name AS office,
         div.name AS division,
         u.is_active,
+        u.approved_at,
         u.last_login_at,
         u.created_at
       FROM users u
@@ -196,10 +214,57 @@ router.patch('/:id/toggle-active', authorize('ADMIN'), async (req, res, next) =>
       });
     }
 
+    // 활성화 시 approved_at이 없으면 자동 설정
+    if (result.rows[0].is_active) {
+      await query(
+        'UPDATE users SET approved_at = COALESCE(approved_at, NOW()) WHERE id = $1',
+        [id]
+      );
+    }
+
     res.json({
       success: true,
       data: result.rows[0]
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 사용자 승인 ==========
+router.patch('/:id/approve', authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      `UPDATE users SET is_active = true, approved_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND is_active = false AND approved_at IS NULL
+       RETURNING id, name, email, is_active`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_005', message: '승인 대상 사용자를 찾을 수 없습니다.' }
+      });
+    }
+
+    // 승인된 사용자에게 알림 발송
+    try {
+      await createNotification(
+        parseInt(id),
+        'ACCOUNT_APPROVED',
+        '계정 승인 완료',
+        '관리자가 계정을 승인했습니다. 이제 로그인할 수 있습니다.',
+        null,
+        null
+      );
+    } catch (notifErr) {
+      console.error('Failed to notify user:', notifErr);
+    }
+
+    res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     next(error);
   }

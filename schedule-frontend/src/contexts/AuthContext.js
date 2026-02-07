@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = useCallback(async (userData) => {
     const data = await api.register(userData);
-    setUser(data.user);
+    // 관리자 승인 필요 - 자동 로그인하지 않음
     return data;
   }, []);
 

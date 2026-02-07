@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const { query } = require('../config/database');
 const { generateToken, authenticate } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
+const { createNotification } = require('../src/controllers/notificationController');
 
 const router = express.Router();
 
@@ -113,35 +114,39 @@ router.post('/register',
       // 비밀번호 해싱
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 사용자 생성
+      // 사용자 생성 (is_active = false: 관리자 승인 필요)
       const result = await query(
-        `INSERT INTO users (email, password_hash, name, position, division_id, office_id, department_id, role, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'USER', NOW(), NOW())
+        `INSERT INTO users (email, password_hash, name, position, division_id, office_id, department_id, role, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'USER', false, NOW(), NOW())
          RETURNING id, email, name, position, role`,
         [email, hashedPassword, name, position, division_id, office_id, department_id]
       );
 
       const user = result.rows[0];
 
-      // JWT 토큰 생성
-      const token = generateToken(user.id);
+      // 관리자에게 승인 요청 알림 발송
+      try {
+        const adminUsers = await query(
+          "SELECT id FROM users WHERE role = 'ADMIN' AND is_active = true"
+        );
+        for (const admin of adminUsers.rows) {
+          await createNotification(
+            admin.id,
+            'USER_REGISTERED',
+            '새 사용자 가입 승인 요청',
+            `${name} (${email})님이 회원가입했습니다. 승인이 필요합니다.`,
+            null,
+            { userId: user.id, userName: name, userEmail: email }
+          );
+        }
+      } catch (notifErr) {
+        console.error('Failed to notify admins:', notifErr);
+      }
 
       res.status(201).json({
         success: true,
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          position: user.position,
-          division: division,
-          office: office,
-          department: department,
-          divisionId: division_id,
-          officeId: office_id,
-          departmentId: department_id,
-          role: user.role
-        }
+        requiresApproval: true,
+        message: '회원가입이 완료되었습니다. 관리자 승인 후 로그인이 가능합니다.'
       });
 
     } catch (error) {
@@ -177,6 +182,7 @@ router.post('/login',
         `SELECT
           u.id, u.email, u.password_hash, u.name, u.position, u.role,
           u.division_id, u.office_id, u.department_id,
+          u.is_active, u.approved_at,
           d.name as division,
           o.name as office,
           dept.name as department
@@ -211,6 +217,29 @@ router.post('/login',
             message: '이메일 또는 비밀번호가 올바르지 않습니다.'
           }
         });
+      }
+
+      // 계정 활성화 상태 확인
+      if (!user.is_active) {
+        if (!user.approved_at) {
+          // 관리자 승인 대기 중
+          return res.status(403).json({
+            success: false,
+            error: {
+              code: 'AUTH_006',
+              message: '관리자 승인 후 로그인이 가능합니다.'
+            }
+          });
+        } else {
+          // 관리자가 비활성화한 계정
+          return res.status(403).json({
+            success: false,
+            error: {
+              code: 'AUTH_007',
+              message: '계정이 비활성화되었습니다. 관리자에게 문의하세요.'
+            }
+          });
+        }
       }
 
       // JWT 토큰 생성

@@ -4,7 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
 import ErrorAlert from '../common/ErrorAlert';
-import { Calendar, ArrowLeft, Sun, Moon } from 'lucide-react';
+import { Calendar, ArrowLeft, Sun, Moon, CheckCircle } from 'lucide-react';
 import api from '../../utils/api';
 
 export default function SignupPage({ onBackClick }) {
@@ -24,6 +24,7 @@ export default function SignupPage({ onBackClick }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [organizations, setOrganizations] = useState({
     divisions: [],
     offices: {},
@@ -117,7 +118,10 @@ export default function SignupPage({ onBackClick }) {
 
     try {
       const { passwordConfirm, ...submitData } = formData;
-      await register(submitData);
+      const result = await register(submitData);
+      if (result.requiresApproval) {
+        setSuccess(true);
+      }
     } catch (err) {
       setError(err.message || '회원가입에 실패했습니다.');
     } finally {
@@ -190,6 +194,34 @@ export default function SignupPage({ onBackClick }) {
           </h1>
         </div>
 
+        {success ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <CheckCircle size={64} color="#10b981" style={{ margin: '0 auto 20px' }} />
+            <h2 style={{ fontSize: '20px', fontWeight: '600', color: textColor, marginBottom: '12px' }}>
+              회원가입 완료
+            </h2>
+            <p style={{ color: secondaryTextColor, fontSize: '14px', lineHeight: '1.6', marginBottom: '32px' }}>
+              회원가입이 완료되었습니다.<br />
+              관리자 승인 후 로그인이 가능합니다.
+            </p>
+            <button
+              onClick={onBackClick}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: '#3B82F6',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              로그인 페이지로 돌아가기
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div>
@@ -359,6 +391,7 @@ export default function SignupPage({ onBackClick }) {
             {loading ? '가입 중...' : '회원가입'}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

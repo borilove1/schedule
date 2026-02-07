@@ -81,7 +81,8 @@ CREATE TABLE users (
     scope admin_scope, -- 부서장/관리자의 조회 범위
     
     -- 메타 정보
-    is_active BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT false,
+    approved_at TIMESTAMP WITH TIME ZONE,
     last_login_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -414,8 +415,8 @@ INSERT INTO departments (name, office_id) VALUES
 -- 안전재난부, 각 지사는 하위 부서 없음
 
 -- 기본 관리자 계정 (비밀번호: admin1234)
-INSERT INTO users (email, password_hash, name, position, department_id, office_id, division_id, role)
-VALUES ('admin@admin.com', '$2b$10$KhDtW2rngfY.kTP84M6JoOyP2Pap.HHPIpfALbXjMei4wOrYftjC.', '관리자', '관리자', 1, 1, 1, 'ADMIN');
+INSERT INTO users (email, password_hash, name, position, department_id, office_id, division_id, role, is_active, approved_at)
+VALUES ('admin@admin.com', '$2b$10$KhDtW2rngfY.kTP84M6JoOyP2Pap.HHPIpfALbXjMei4wOrYftjC.', '관리자', '관리자', 1, 1, 1, 'ADMIN', true, NOW());
 
 -- ========================================
 -- 10. 유용한 뷰 (View)
@@ -423,7 +424,7 @@ VALUES ('admin@admin.com', '$2b$10$KhDtW2rngfY.kTP84M6JoOyP2Pap.HHPIpfALbXjMei4w
 
 -- 사용자 전체 정보 뷰 (조직 정보 포함)
 CREATE VIEW v_users_with_org AS
-SELECT 
+SELECT
     u.id,
     u.email,
     u.name,
@@ -434,6 +435,7 @@ SELECT
     o.name AS office_name,
     div.name AS division_name,
     u.is_active,
+    u.approved_at,
     u.last_login_at,
     u.created_at
 FROM users u

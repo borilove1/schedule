@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAuth } from '../../contexts/AuthContext';
-import { Search, Edit2, ToggleLeft, ToggleRight, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Edit2, ToggleLeft, ToggleRight, Trash2, ChevronLeft, ChevronRight, UserCheck } from 'lucide-react';
 import ErrorAlert from '../common/ErrorAlert';
 import ConfirmDialog from '../common/ConfirmDialog';
 import api from '../../utils/api';
@@ -44,7 +44,9 @@ export default function UserManagement() {
       if (activeFilter === 'active') {
         filteredUsers = filteredUsers.filter(u => u.is_active);
       } else if (activeFilter === 'inactive') {
-        filteredUsers = filteredUsers.filter(u => !u.is_active);
+        filteredUsers = filteredUsers.filter(u => !u.is_active && u.approved_at);
+      } else if (activeFilter === 'pending') {
+        filteredUsers = filteredUsers.filter(u => !u.is_active && !u.approved_at);
       }
       setUsers(filteredUsers);
       setPagination(result.pagination || { total: 0, page: 1, limit: 20, totalPages: 0 });
@@ -61,6 +63,11 @@ export default function UserManagement() {
 
   const handleToggleActive = async (userId) => {
     try { await api.toggleUserActive(userId); fetchUsers(pagination.page); }
+    catch (err) { setError(err.message); }
+  };
+
+  const handleApprove = async (userId) => {
+    try { await api.approveUser(userId); fetchUsers(pagination.page); }
     catch (err) { setError(err.message); }
   };
 
@@ -95,6 +102,7 @@ export default function UserManagement() {
         <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)} style={selectStyle}>
           <option value="">전체 상태</option>
           <option value="active">활성</option>
+          <option value="pending">승인 대기</option>
           <option value="inactive">비활성</option>
         </select>
       </div>
@@ -143,15 +151,23 @@ export default function UserManagement() {
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{
                         padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500',
-                        backgroundColor: user.is_active ? '#10b98120' : '#ef444420',
-                        color: user.is_active ? '#10b981' : '#ef4444',
-                      }}>{user.is_active ? '활성' : '비활성'}</span>
+                        backgroundColor: user.is_active ? '#10b98120'
+                          : (!user.approved_at ? '#f59e0b20' : '#ef444420'),
+                        color: user.is_active ? '#10b981'
+                          : (!user.approved_at ? '#f59e0b' : '#ef4444'),
+                      }}>{user.is_active ? '활성' : (!user.approved_at ? '승인 대기' : '비활성')}</span>
                     </td>
                     <td style={{ padding: '12px 16px', color: secondaryTextColor, whiteSpace: 'nowrap', fontSize: '12px' }}>
                       {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString('ko-KR') : '-'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
+                        {!user.is_active && !user.approved_at && (
+                          <button onClick={() => handleApprove(user.id)} style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#10b981', padding: '4px', display: 'flex', alignItems: 'center',
+                          }} title="승인"><UserCheck size={15} /></button>
+                        )}
                         <button onClick={() => setSelectedUser(user)} style={{
                           background: 'none', border: 'none', cursor: 'pointer',
                           color: '#3B82F6', padding: '4px', display: 'flex', alignItems: 'center',
