@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Share2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Share2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
@@ -34,6 +34,8 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
   const [error, setError] = useState('');
   const [offices, setOffices] = useState([]);
   const [selectedOfficeIds, setSelectedOfficeIds] = useState([]);
+  const [showOfficeDropdown, setShowOfficeDropdown] = useState(false);
+  const officeDropdownRef = useRef(null);
 
   const { isDarkMode, bgColor, cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
   const { fontFamily, inputStyle, labelStyle } = useCommonStyles();
@@ -44,6 +46,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
       setError('');
       setLoading(false);
       setSelectedOfficeIds([]);
+      setShowOfficeDropdown(false);
       // 처/실 목록 로드
       if (user?.divisionId) {
         api.getOffices(user.divisionId).then(data => {
@@ -53,6 +56,16 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
       }
     }
   }, [isOpen, selectedDate, user?.divisionId]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (officeDropdownRef.current && !officeDropdownRef.current.contains(e.target)) {
+        setShowOfficeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -192,29 +205,80 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
               <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Share2 size={14} /> 일정 공유 (선택사항)
               </label>
-              <div style={{
-                padding: '12px', borderRadius: '8px', border: `1px solid ${borderColor}`,
-                backgroundColor: bgColor, maxHeight: '150px', overflowY: 'auto'
-              }}>
-                {offices.map(office => (
-                  <label key={office.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 4px',
-                    cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor
+              <div ref={officeDropdownRef} style={{ position: 'relative' }}>
+                <div
+                  onClick={() => setShowOfficeDropdown(!showOfficeDropdown)}
+                  style={{
+                    ...inputStyle,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    minHeight: '44px',
+                    paddingRight: '36px',
+                    position: 'relative',
+                    flexWrap: 'wrap',
+                    gap: '4px'
+                  }}
+                >
+                  {selectedOfficeIds.length > 0 ? (
+                    selectedOfficeIds.map(id => {
+                      const office = offices.find(o => o.id === id);
+                      return office ? (
+                        <span key={id} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '2px 8px', borderRadius: '12px',
+                          backgroundColor: isDarkMode ? '#3b2f63' : '#ede9fe',
+                          color: isDarkMode ? '#c4b5fd' : '#7c3aed',
+                          fontSize: '12px', fontWeight: '500'
+                        }}>
+                          {office.name}
+                          <span
+                            onClick={(e) => { e.stopPropagation(); toggleOffice(id); }}
+                            style={{ cursor: 'pointer', fontSize: '14px', lineHeight: 1, marginLeft: '2px' }}
+                          >&times;</span>
+                        </span>
+                      ) : null;
+                    })
+                  ) : (
+                    <span style={{ color: secondaryTextColor, fontSize: '14px' }}>공유할 처/실을 선택하세요</span>
+                  )}
+                  <ChevronDown size={16} style={{
+                    position: 'absolute', right: '12px', top: '50%',
+                    color: secondaryTextColor,
+                    transform: showOfficeDropdown ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+                    transition: 'transform 0.2s'
+                  }} />
+                </div>
+                {showOfficeDropdown && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                    marginTop: '4px', borderRadius: '8px', border: `1px solid ${borderColor}`,
+                    backgroundColor: cardBg, boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
+                    maxHeight: '200px', overflowY: 'auto'
                   }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedOfficeIds.includes(office.id)}
-                      onChange={() => toggleOffice(office.id)}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3B82F6' }}
-                    />
-                    {office.name}
-                  </label>
-                ))}
+                    {offices.map(office => (
+                      <label key={office.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                        cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor,
+                        backgroundColor: selectedOfficeIds.includes(office.id)
+                          ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedOfficeIds.includes(office.id)}
+                          onChange={() => toggleOffice(office.id)}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#3B82F6' }}
+                        />
+                        {office.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
               <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily }}>
                 {selectedOfficeIds.length > 0
                   ? `${selectedOfficeIds.length}개 처/실 소속 전원이 이 일정을 볼 수 있습니다.`
-                  : '같은 부서원은 항상 볼 수 있습니다. 다른 처/실과 공유하려면 선택하세요.'}
+                  : '같은 부서원은 항상 볼 수 있습니다.'}
               </p>
             </div>
           )}
