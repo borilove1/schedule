@@ -8,7 +8,7 @@ import { ArrowLeft, Sun, Moon, CheckCircle, Eye, EyeOff, ChevronDown } from 'luc
 import api from '../../utils/api';
 
 // 커스텀 드롭다운 컴포넌트
-function CustomSelect({ value, onChange, options, placeholder, disabled, colors }) {
+function CustomSelect({ value, onChange, options, placeholder, disabled, colors, dropUp, maxItems }) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef(null);
   const { isDarkMode, cardBg, textColor, secondaryTextColor, borderColor, inputBg } = colors;
@@ -59,12 +59,13 @@ function CustomSelect({ value, onChange, options, placeholder, disabled, colors 
       </div>
       {isOpen && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-          marginTop: '4px', borderRadius: '12px', border: `1px solid ${borderColor}`,
+          position: 'absolute', left: 0, right: 0, zIndex: 10,
+          ...(dropUp ? { bottom: '100%', marginBottom: '4px' } : { top: '100%', marginTop: '4px' }),
+          borderRadius: '12px', border: `1px solid ${borderColor}`,
           backgroundColor: cardBg,
           boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
           overflow: 'hidden',
-          maxHeight: '200px',
+          maxHeight: maxItems ? `${maxItems * 38}px` : '200px',
           overflowY: 'auto',
         }}>
           {options.map(opt => (
@@ -501,6 +502,7 @@ export default function SignupPage({ onBackClick }) {
               placeholder="소속 사업소를 선택하세요"
               disabled={!formData.division || loadingOrgs}
               colors={colors}
+              maxItems={3}
             />
           </div>
 
@@ -513,6 +515,7 @@ export default function SignupPage({ onBackClick }) {
               placeholder={availableDepartments.length > 0 ? '소속 부서를 선택하세요' : '해당 없음'}
               disabled={!formData.office || loadingOrgs || availableDepartments.length === 0}
               colors={colors}
+              maxItems={3}
             />
           </div>
 

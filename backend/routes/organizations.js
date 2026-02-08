@@ -34,12 +34,16 @@ router.get('/structure', async (req, res, next) => {
       structure.offices[division.name] = divisionOffices;
     });
 
-    // 처별 부서 매핑
+    // 처별 부서 매핑 (동명의 처가 여러 본부에 있을 수 있으므로 기존 배열에 병합)
     offices.forEach(office => {
       const officeDepartments = departments
         .filter(d => d.office_id === office.id)
         .map(d => ({ id: d.id, name: d.name }));
-      structure.departments[office.name] = officeDepartments;
+      if (structure.departments[office.name]) {
+        structure.departments[office.name] = structure.departments[office.name].concat(officeDepartments);
+      } else {
+        structure.departments[office.name] = officeDepartments;
+      }
     });
 
     res.json({
