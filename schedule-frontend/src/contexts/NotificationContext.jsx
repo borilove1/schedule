@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import { isPushSupported, subscribeToPush, isSubscribedToPush } from '../utils/pushHelper';
+import { checkPushSupport, subscribeToPush, isSubscribedToPush } from '../utils/pushHelper';
 
 const NotificationContext = createContext();
 
@@ -27,10 +27,10 @@ export function NotificationProvider({ children }) {
     }
   }, []);
 
-  // Push 상태 초기화
+  // Push 상태 초기화 (비동기 - SW ready 대기 후 정확한 체크)
   useEffect(() => {
     const initPush = async () => {
-      const supported = isPushSupported();
+      const supported = await checkPushSupport();
       setPushSupported(supported);
 
       if (supported) {
@@ -38,7 +38,7 @@ export function NotificationProvider({ children }) {
         setPushSubscribed(subscribed);
 
         // 권한이 이미 granted인데 구독이 없으면 자동 재구독
-        if (!subscribed && Notification.permission === 'granted') {
+        if (!subscribed && 'Notification' in window && Notification.permission === 'granted') {
           const success = await subscribeToPush();
           setPushSubscribed(success);
         }

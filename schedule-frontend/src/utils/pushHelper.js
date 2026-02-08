@@ -11,12 +11,28 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 /**
- * 푸시 알림 지원 여부 확인
+ * 푸시 알림 지원 여부 확인 (동기 - 기본 체크)
  */
 export function isPushSupported() {
-  return 'serviceWorker' in navigator
-    && 'PushManager' in window
-    && 'Notification' in window;
+  return 'serviceWorker' in navigator && 'PushManager' in window;
+}
+
+/**
+ * 푸시 알림 지원 여부 확인 (비동기 - SW ready 후 정확한 체크)
+ * iOS standalone PWA에서는 SW가 준비된 후에만 PushManager 접근 가능
+ */
+export async function checkPushSupport() {
+  if (!('serviceWorker' in navigator)) return false;
+
+  try {
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 5000))
+    ]);
+    return !!(registration && registration.pushManager);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -24,8 +40,9 @@ export function isPushSupported() {
  * @returns {'default'|'granted'|'denied'|'unsupported'}
  */
 export function getPushPermissionState() {
-  if (!isPushSupported()) return 'unsupported';
-  return Notification.permission;
+  if ('Notification' in window) return Notification.permission;
+  if ('permission' in (PushManager || {})) return 'default';
+  return 'unsupported';
 }
 
 /**
@@ -36,8 +53,8 @@ export function getPushPermissionState() {
  * 4. 백엔드에 구독 정보 전송
  */
 export async function subscribeToPush() {
-  if (!isPushSupported()) {
-    console.warn('[Push] 브라우저 미지원');
+  if (!('serviceWorker' in navigator)) {
+    console.warn('[Push] ServiceWorker 미지원');
     return false;
   }
 
@@ -49,13 +66,21 @@ export async function subscribeToPush() {
       return false;
     }
 
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.warn('[Push] 알림 권한 거부:', permission);
-      return false;
+    // 알림 권한 요청 (Notification API 사용 가능 시)
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.warn('[Push] 알림 권한 거부:', permission);
+        return false;
+      }
     }
 
     const registration = await navigator.serviceWorker.ready;
+
+    if (!registration.pushManager) {
+      console.error('[Push] PushManager를 사용할 수 없음');
+      return false;
+    }
 
     // 기존 구독이 있으면 해제 후 재구독 (VAPID 키 변경 대응)
     const existing = await registration.pushManager.getSubscription();
@@ -89,10 +114,11 @@ export async function subscribeToPush() {
  * 푸시 알림 구독 해제
  */
 export async function unsubscribeFromPush() {
-  if (!isPushSupported()) return false;
+  if (!('serviceWorker' in navigator)) return false;
 
   try {
     const registration = await navigator.serviceWorker.ready;
+    if (!registration.pushManager) return true;
     const subscription = await registration.pushManager.getSubscription();
 
     if (subscription) {
@@ -112,9 +138,10 @@ export async function unsubscribeFromPush() {
  * 현재 푸시 구독 존재 여부
  */
 export async function isSubscribedToPush() {
-  if (!isPushSupported()) return false;
+  if (!('serviceWorker' in navigator)) return false;
   try {
     const registration = await navigator.serviceWorker.ready;
+    if (!registration.pushManager) return false;
     const subscription = await registration.pushManager.getSubscription();
     return !!subscription;
   } catch {
