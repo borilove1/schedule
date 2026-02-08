@@ -146,7 +146,7 @@ export default function SignupPage({ onBackClick }) {
         maxWidth: '500px',
         backgroundColor: cardBg,
         borderRadius: '16px',
-        padding: '40px',
+        padding: '28px 32px',
         boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.3)' : '0 10px 40px rgba(0,0,0,0.08)',
         transition: 'background-color 0.2s, box-shadow 0.2s'
       }}>
@@ -155,7 +155,7 @@ export default function SignupPage({ onBackClick }) {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '24px'
+          marginBottom: '16px'
         }}>
           <button
             onClick={onBackClick}
@@ -189,9 +189,9 @@ export default function SignupPage({ onBackClick }) {
           </button>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <Calendar size={48} color="#3B82F6" style={{ margin: '0 auto 16px' }} />
-          <h1 style={{ fontSize: '24px', fontWeight: '600', color: textColor, margin: 0 }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <Calendar size={36} color="#3B82F6" style={{ margin: '0 auto 10px' }} />
+          <h1 style={{ fontSize: '22px', fontWeight: '600', color: textColor, margin: 0 }}>
             회원가입
           </h1>
         </div>
@@ -225,7 +225,7 @@ export default function SignupPage({ onBackClick }) {
           </div>
         ) : (
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div>
               <label style={labelStyle}>이름 *</label>
               <input
@@ -259,7 +259,7 @@ export default function SignupPage({ onBackClick }) {
             </div>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>이메일 *</label>
             <input
               type="email"
@@ -272,7 +272,7 @@ export default function SignupPage({ onBackClick }) {
             />
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>비밀번호 *</label>
             <div style={{ position: 'relative' }}>
               <input
@@ -308,7 +308,7 @@ export default function SignupPage({ onBackClick }) {
             </div>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>비밀번호 확인 *</label>
             <div style={{ position: 'relative' }}>
               <input
@@ -354,7 +354,7 @@ export default function SignupPage({ onBackClick }) {
             )}
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>본부 *</label>
             <select
               name="division"
@@ -372,7 +372,7 @@ export default function SignupPage({ onBackClick }) {
             </select>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>처 *</label>
             <select
               name="office"
@@ -395,7 +395,7 @@ export default function SignupPage({ onBackClick }) {
             )}
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '18px' }}>
             <label style={labelStyle}>부서{availableDepartments.length > 0 ? ' *' : ''}</label>
             <select
               name="department"
@@ -425,12 +425,12 @@ export default function SignupPage({ onBackClick }) {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '14px',
+              padding: '12px',
               borderRadius: '8px',
               border: 'none',
               backgroundColor: loading ? '#1e40af' : '#3B82F6',
               color: '#fff',
-              fontSize: '16px',
+              fontSize: '15px',
               fontWeight: '600',
               cursor: loading ? 'not-allowed' : 'pointer'
             }}

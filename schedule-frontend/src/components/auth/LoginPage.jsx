@@ -46,7 +46,7 @@ export default function LoginPage({ onSignupClick }) {
         maxWidth: '400px',
         backgroundColor: cardBg,
         borderRadius: '16px',
-        padding: '40px',
+        padding: '28px 32px',
         boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.3)' : '0 10px 40px rgba(0,0,0,0.08)',
         transition: 'background-color 0.2s, box-shadow 0.2s'
       }}>
@@ -69,9 +69,9 @@ export default function LoginPage({ onSignupClick }) {
           </button>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <Calendar size={48} color="#3B82F6" style={{ margin: '0 auto 16px' }} />
-          <h1 style={{ fontSize: '24px', fontWeight: '600', color: textColor, margin: 0 }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <Calendar size={36} color="#3B82F6" style={{ margin: '0 auto 10px' }} />
+          <h1 style={{ fontSize: '22px', fontWeight: '600', color: textColor, margin: 0 }}>
             업무일정 관리
           </h1>
           <p style={{ fontSize: '14px', color: secondaryTextColor, marginTop: '8px' }}>
@@ -80,7 +80,7 @@ export default function LoginPage({ onSignupClick }) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <label style={labelStyle}>이메일</label>
             <input
               type="email"
@@ -92,7 +92,7 @@ export default function LoginPage({ onSignupClick }) {
             />
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '18px' }}>
             <label style={labelStyle}>비밀번호</label>
             <div style={{ position: 'relative' }}>
               <input
@@ -149,7 +149,7 @@ export default function LoginPage({ onSignupClick }) {
         </form>
 
         <div style={{
-          marginTop: '24px',
+          marginTop: '18px',
           textAlign: 'center',
           fontSize: '14px',
           color: secondaryTextColor
