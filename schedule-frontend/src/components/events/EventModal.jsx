@@ -28,7 +28,7 @@ const getInitialFormData = (selectedDate) => {
   };
 };
 
-export default function EventModal({ isOpen, onClose, onSuccess, selectedDate }) {
+export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, rateLimitCountdown = 0, onRateLimitStart }) {
   const { user } = useAuth();
   const [formData, setFormData] = useState(() => getInitialFormData(selectedDate));
   const [loading, setLoading] = useState(false);
@@ -160,7 +160,9 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.message || '일정 생성에 실패했습니다.');
+      const msg = err.message || '일정 생성에 실패했습니다.';
+      setError(msg);
+      if ((msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT')) && onRateLimitStart) onRateLimitStart(30);
     } finally {
       setLoading(false);
     }
@@ -424,7 +426,24 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate })
             </div>
           )}
 
-          <ErrorAlert message={error} />
+          {rateLimitCountdown > 0 ? (
+            <div style={{
+              padding: '12px 16px', borderRadius: '8px',
+              backgroundColor: '#fef3c7', color: '#92400e', fontSize: '14px',
+              marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            }}>
+              <span>요청이 너무 많습니다. 잠시 후 다시 시도해주세요.</span>
+              <span style={{
+                fontWeight: '700', fontSize: '14px', backgroundColor: '#f59e0b',
+                color: '#fff', borderRadius: '12px', padding: '2px 10px', minWidth: '28px',
+                textAlign: 'center', display: 'inline-block',
+              }}>
+                {rateLimitCountdown}
+              </span>
+            </div>
+          ) : (
+            <ErrorAlert message={error} />
+          )}
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
             <button type="button" onClick={onClose} style={{

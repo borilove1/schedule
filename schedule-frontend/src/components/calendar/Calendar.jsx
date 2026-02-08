@@ -164,22 +164,7 @@ export default function Calendar() {
         userId={user?.id}
       />
 
-      {rateLimitCountdown > 0 && (
-        <div style={{
-          padding: '10px 16px', marginTop: '8px', borderRadius: '8px',
-          backgroundColor: '#fef3c7', color: '#92400e', fontSize: '13px', textAlign: 'center',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-        }}>
-          <span>요청이 너무 많습니다. 잠시 후 자동으로 새로고침됩니다.</span>
-          <span style={{
-            fontWeight: '700', fontSize: '14px', backgroundColor: '#f59e0b',
-            color: '#fff', borderRadius: '12px', padding: '2px 10px', minWidth: '28px',
-            textAlign: 'center', display: 'inline-block',
-          }}>
-            {rateLimitCountdown}
-          </span>
-        </div>
-      )}
+
 
       {eventsLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
@@ -212,12 +197,16 @@ export default function Calendar() {
         onClose={() => setShowModal(false)}
         onSuccess={handleEventSuccess}
         selectedDate={selectedDate}
+        rateLimitCountdown={rateLimitCountdown}
+        onRateLimitStart={startCountdown}
       />
       <EventDetailModal
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
         eventId={selectedEventId}
         onSuccess={handleEventSuccess}
+        rateLimitCountdown={rateLimitCountdown}
+        onRateLimitStart={startCountdown}
       />
     </div>
   );

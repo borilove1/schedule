@@ -12,11 +12,13 @@ import ConfirmDialog from '../common/ConfirmDialog';
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", sans-serif';
 
-export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }) {
+export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, rateLimitCountdown = 0, onRateLimitStart }) {
   const { user: currentUser } = useAuth();
   const { refreshNotifications } = useNotification();
   const { cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
   const actionGuard = useActionGuard();
+
+  const isRateLimitError = (msg) => msg && (msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT'));
 
   const [event, setEvent] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -80,7 +82,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         setError('일정 데이터를 불러올 수 없습니다.');
       }
     } catch (err) {
-      setError(`오류: ${err.message}`);
+      const msg = err.message || '';
+      setError(`오류: ${msg}`);
+      if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
     } finally {
       setLoading(false);
     }
@@ -130,7 +134,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         refreshNotifications();
         onClose();
       } catch (err) {
-        setError(err.message || '일정 수정에 실패했습니다.');
+        const msg = err.message || '일정 수정에 실패했습니다.';
+        setError(msg);
+        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
       } finally {
         setLoading(false);
       }
@@ -152,7 +158,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         onClose();
         refreshNotifications();
       } catch (err) {
-        setError(err.message || '일정 삭제에 실패했습니다.');
+        const msg = err.message || '일정 삭제에 실패했습니다.';
+        setError(msg);
+        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
       } finally {
         setLoading(false);
       }
@@ -191,7 +199,9 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
         onSuccess();
         refreshNotifications();
       } catch (err) {
-        setError(err.message || '상태 변경에 실패했습니다.');
+        const msg = err.message || '상태 변경에 실패했습니다.';
+        setError(msg);
+        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
       } finally {
         setLoading(false);
       }
@@ -283,6 +293,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                 actionInProgress={actionGuard.inProgress}
                 error={error}
                 eventId={eventId}
+                rateLimitCountdown={rateLimitCountdown}
               />
             ) : (
               <EventEditForm
@@ -301,6 +312,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                   prev.includes(officeId) ? prev.filter(id => id !== officeId) : [...prev, officeId]
                 )}
                 onRecurringToggle={() => setFormData(prev => ({ ...prev, isRecurring: !prev.isRecurring }))}
+                rateLimitCountdown={rateLimitCountdown}
               />
             )}
           </div>

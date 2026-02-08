@@ -8,7 +8,7 @@ import CommentSection from './CommentSection';
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", sans-serif';
 
 export default function EventDetailView({
-  event, currentUser, onEdit, onDelete, onComplete, loading, actionInProgress, error, eventId
+  event, currentUser, onEdit, onDelete, onComplete, loading, actionInProgress, error, eventId, rateLimitCountdown = 0
 }) {
   const { isDarkMode, textColor, secondaryTextColor, inputBg } = useThemeColors();
 
@@ -133,7 +133,24 @@ export default function EventDetailView({
         )}
       </div>
 
-      <ErrorAlert message={error} />
+      {rateLimitCountdown > 0 ? (
+        <div style={{
+          padding: '12px 16px', borderRadius: '8px',
+          backgroundColor: '#fef3c7', color: '#92400e', fontSize: '14px',
+          marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+        }}>
+          <span>요청이 너무 많습니다. 잠시 후 다시 시도해주세요.</span>
+          <span style={{
+            fontWeight: '700', fontSize: '14px', backgroundColor: '#f59e0b',
+            color: '#fff', borderRadius: '12px', padding: '2px 10px', minWidth: '28px',
+            textAlign: 'center', display: 'inline-block',
+          }}>
+            {rateLimitCountdown}
+          </span>
+        </div>
+      ) : (
+        <ErrorAlert message={error} />
+      )}
 
       {canEdit ? (
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
