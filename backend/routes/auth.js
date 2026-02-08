@@ -467,4 +467,77 @@ router.put('/me', authenticate,
   }
 );
 
+// ========== 이메일 알림 설정 조회 ==========
+router.get('/email-preferences', authenticate, async (req, res, next) => {
+  try {
+    const result = await query(
+      'SELECT email_notifications_enabled, email_preferences FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        emailNotificationsEnabled: result.rows[0].email_notifications_enabled,
+        emailPreferences: result.rows[0].email_preferences
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 이메일 알림 설정 수정 ==========
+router.put('/email-preferences', authenticate, async (req, res, next) => {
+  try {
+    const { emailNotificationsEnabled, emailPreferences } = req.body;
+
+    const setClauses = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (emailNotificationsEnabled !== undefined) {
+      setClauses.push(`email_notifications_enabled = $${paramIndex++}`);
+      values.push(!!emailNotificationsEnabled);
+    }
+    if (emailPreferences !== undefined) {
+      setClauses.push(`email_preferences = $${paramIndex++}`);
+      values.push(JSON.stringify(emailPreferences));
+    }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: '변경할 설정이 없습니다.' }
+      });
+    }
+
+    values.push(req.user.id);
+
+    const result = await query(
+      `UPDATE users SET ${setClauses.join(', ')}, updated_at = NOW()
+       WHERE id = $${paramIndex}
+       RETURNING email_notifications_enabled, email_preferences`,
+      values
+    );
+
+    res.json({
+      success: true,
+      data: {
+        emailNotificationsEnabled: result.rows[0].email_notifications_enabled,
+        emailPreferences: result.rows[0].email_preferences
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

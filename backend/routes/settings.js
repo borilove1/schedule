@@ -1,6 +1,7 @@
 const express = require('express');
 const { query } = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth');
+const { testConnection, sendEmail, invalidateTransporterCache } = require('../src/utils/emailService');
 
 const router = express.Router();
 
@@ -43,6 +44,12 @@ router.put('/', async (req, res, next) => {
       `, [JSON.stringify(value), req.user.id, key]);
 
       updatedSettings[key] = value;
+    }
+
+    // SMTP 관련 설정이 변경되면 transporter 캐시 무효화
+    const hasSmtpChanges = Object.keys(updates).some(k => k.startsWith('smtp_') || k === 'email_enabled');
+    if (hasSmtpChanges) {
+      invalidateTransporterCache();
     }
 
     res.json({
@@ -112,6 +119,44 @@ router.put('/:key', async (req, res, next) => {
         updatedAt: result.rows[0].updated_at
       }
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 테스트 이메일 발송 ==========
+router.post('/test-email', async (req, res, next) => {
+  try {
+    // SMTP 연결 테스트
+    const connectionResult = await testConnection();
+    if (!connectionResult.success) {
+      return res.json({
+        success: false,
+        error: { message: connectionResult.message }
+      });
+    }
+
+    // 관리자 본인 이메일로 테스트 발송
+    const userResult = await query('SELECT email FROM users WHERE id = $1', [req.user.id]);
+    const adminEmail = userResult.rows[0].email;
+
+    const emailResult = await sendEmail(
+      adminEmail,
+      '이메일 설정 테스트',
+      '이메일 알림 설정이 올바르게 구성되었습니다. 이 메일이 정상적으로 수신되었다면 SMTP 설정이 완료된 것입니다.'
+    );
+
+    if (emailResult.success) {
+      res.json({
+        success: true,
+        data: { message: `테스트 이메일이 ${adminEmail}으로 발송되었습니다.` }
+      });
+    } else {
+      res.json({
+        success: false,
+        error: { message: `이메일 발송 실패: ${emailResult.error}` }
+      });
+    }
   } catch (error) {
     next(error);
   }

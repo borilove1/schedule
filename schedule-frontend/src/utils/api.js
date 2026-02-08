@@ -252,6 +252,24 @@ class ApiClient {
     });
   }
 
+  async sendTestEmail() {
+    return this.request('/settings/test-email', {
+      method: 'POST',
+    });
+  }
+
+  // ========== 이메일 알림 설정 ==========
+  async getEmailPreferences() {
+    return this.request('/auth/email-preferences');
+  }
+
+  async updateEmailPreferences(prefs) {
+    return this.request('/auth/email-preferences', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
+    });
+  }
+
   // 댓글
   async getEventComments(eventId) {
     return this.request(`/comments/events/${eventId}`);

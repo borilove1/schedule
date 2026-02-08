@@ -1,4 +1,5 @@
 const { query } = require('../../config/database');
+const { sendEmail } = require('../utils/emailService');
 
 /**
  * Convert snake_case to camelCase for frontend
@@ -185,12 +186,53 @@ exports.createNotification = async (userId, type, title, message, relatedEventId
       metadata ? JSON.stringify(metadata) : null
     ]);
 
-    return convertToCamelCase(result.rows[0]);
+    const notification = convertToCamelCase(result.rows[0]);
+
+    // 이메일 알림 비동기 발송 (인앱 알림에 영향 없음)
+    sendEmailNotification(userId, type, title, message).catch(err => {
+      console.error('[Email] Background send error:', err.message);
+    });
+
+    return notification;
   } catch (error) {
     console.error('Create notification error:', error);
     throw error;
   }
 };
+
+/**
+ * 이메일 알림 발송 (내부 헬퍼)
+ * 사용자 설정 + 시스템 설정 확인 후 발송
+ */
+async function sendEmailNotification(userId, type, title, message) {
+  // 사용자 이메일 + 수신 설정 조회
+  const userResult = await query(
+    'SELECT email, email_notifications_enabled, email_preferences FROM users WHERE id = $1',
+    [userId]
+  );
+  if (userResult.rows.length === 0) return;
+
+  const user = userResult.rows[0];
+
+  // 마스터 토글 확인
+  if (!user.email_notifications_enabled) return;
+
+  // 타입별 수신 설정 확인
+  const prefs = user.email_preferences || {};
+  if (prefs[type] === false) return;
+
+  // 시스템 이메일 활성화 확인
+  const settingResult = await query(
+    "SELECT value FROM system_settings WHERE key = 'email_enabled'"
+  );
+  if (settingResult.rows.length === 0) return;
+
+  const emailEnabled = settingResult.rows[0].value;
+  if (emailEnabled === false || emailEnabled === 'false') return;
+
+  // 모든 조건 통과 → 이메일 발송
+  await sendEmail(user.email, title, message);
+}
 
 /**
  * Check upcoming events and create reminders

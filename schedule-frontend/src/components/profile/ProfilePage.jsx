@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
-import { ArrowLeft, Save, Lock, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Lock, CheckCircle, Mail } from 'lucide-react';
 import ErrorAlert from '../common/ErrorAlert';
 import api from '../../utils/api';
 
@@ -33,6 +33,23 @@ export default function ProfilePage({ onBack }) {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
 
+  // 이메일 알림 설정
+  const [emailPrefs, setEmailPrefs] = useState({
+    emailNotificationsEnabled: false,
+    emailPreferences: {
+      EVENT_REMINDER: true,
+      EVENT_UPDATED: true,
+      EVENT_COMPLETED: true,
+      EVENT_DELETED: true,
+      USER_REGISTERED: true,
+      ACCOUNT_APPROVED: true,
+    }
+  });
+  const [emailPrefsOriginal, setEmailPrefsOriginal] = useState(null);
+  const [emailPrefsLoading, setEmailPrefsLoading] = useState(false);
+  const [emailPrefsError, setEmailPrefsError] = useState('');
+  const [emailPrefsSuccess, setEmailPrefsSuccess] = useState('');
+
   // 조직 구조
   const [organizations, setOrganizations] = useState({
     divisions: [],
@@ -52,6 +69,23 @@ export default function ProfilePage({ onBack }) {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    const loadEmailPrefs = async () => {
+      try {
+        const data = await api.getEmailPreferences();
+        const prefs = {
+          emailNotificationsEnabled: data.emailNotificationsEnabled,
+          emailPreferences: data.emailPreferences || {}
+        };
+        setEmailPrefs(prefs);
+        setEmailPrefsOriginal(prefs);
+      } catch (error) {
+        console.error('Failed to load email preferences:', error);
+      }
+    };
+    loadEmailPrefs();
+  }, []);
 
   useEffect(() => {
     const loadOrganizations = async () => {
@@ -128,6 +162,33 @@ export default function ProfilePage({ onBack }) {
     } finally {
       setPasswordLoading(false);
     }
+  };
+
+  const handleEmailPrefsSave = async () => {
+    setEmailPrefsLoading(true);
+    setEmailPrefsError('');
+    setEmailPrefsSuccess('');
+    try {
+      await api.updateEmailPreferences(emailPrefs);
+      setEmailPrefsOriginal({ ...emailPrefs });
+      setEmailPrefsSuccess('이메일 알림 설정이 저장되었습니다.');
+      setTimeout(() => setEmailPrefsSuccess(''), 3000);
+    } catch (err) {
+      setEmailPrefsError(err.message || '설정 저장에 실패했습니다.');
+    } finally {
+      setEmailPrefsLoading(false);
+    }
+  };
+
+  const emailPrefsHasChanges = emailPrefsOriginal && JSON.stringify(emailPrefs) !== JSON.stringify(emailPrefsOriginal);
+
+  const NOTIFICATION_TYPE_LABELS = {
+    EVENT_REMINDER: '일정 알림 (마감 임박)',
+    EVENT_UPDATED: '일정 수정 알림',
+    EVENT_COMPLETED: '일정 완료 알림',
+    EVENT_DELETED: '일정 삭제 알림',
+    USER_REGISTERED: '사용자 가입 알림',
+    ACCOUNT_APPROVED: '계정 승인 알림',
   };
 
   const sectionStyle = {
@@ -377,6 +438,101 @@ export default function ProfilePage({ onBack }) {
             <Lock size={16} /> {passwordLoading ? '변경 중...' : '비밀번호 변경'}
           </button>
         </form>
+      </div>
+
+      {/* 이메일 알림 설정 */}
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>
+          <Mail size={18} /> 이메일 알림 설정
+        </div>
+
+        {emailPrefsSuccess && (
+          <div style={successStyle}>
+            <CheckCircle size={16} /> {emailPrefsSuccess}
+          </div>
+        )}
+        <ErrorAlert message={emailPrefsError} />
+
+        {/* 마스터 토글 */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: emailPrefs.emailNotificationsEnabled ? '20px' : '0',
+        }}>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>이메일 알림 받기</div>
+            <div style={{ fontSize: '12px', color: secondaryTextColor, marginTop: '2px' }}>
+              이벤트 발생 시 이메일로 알림을 수신합니다.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEmailPrefs(prev => ({ ...prev, emailNotificationsEnabled: !prev.emailNotificationsEnabled }))}
+            style={{
+              width: '48px', height: '26px', borderRadius: '13px',
+              border: 'none', cursor: 'pointer', position: 'relative',
+              backgroundColor: emailPrefs.emailNotificationsEnabled ? '#3B82F6' : (isDarkMode ? '#475569' : '#cbd5e1'),
+              transition: 'background-color 0.2s', flexShrink: 0,
+            }}
+          >
+            <div style={{
+              width: '20px', height: '20px', borderRadius: '50%',
+              backgroundColor: '#fff', position: 'absolute', top: '3px',
+              left: emailPrefs.emailNotificationsEnabled ? '25px' : '3px',
+              transition: 'left 0.2s',
+            }} />
+          </button>
+        </div>
+
+        {/* 타입별 토글 */}
+        {emailPrefs.emailNotificationsEnabled && (
+          <div style={{ borderTop: `1px solid ${borderColor}`, paddingTop: '16px' }}>
+            {Object.entries(NOTIFICATION_TYPE_LABELS).map(([type, label]) => (
+              <div key={type} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 0',
+              }}>
+                <span style={{ fontSize: '14px', color: textColor }}>{label}</span>
+                <button
+                  type="button"
+                  onClick={() => setEmailPrefs(prev => ({
+                    ...prev,
+                    emailPreferences: {
+                      ...prev.emailPreferences,
+                      [type]: !prev.emailPreferences[type]
+                    }
+                  }))}
+                  style={{
+                    width: '44px', height: '24px', borderRadius: '12px',
+                    border: 'none', cursor: 'pointer', position: 'relative',
+                    backgroundColor: emailPrefs.emailPreferences[type] ? '#3B82F6' : (isDarkMode ? '#475569' : '#cbd5e1'),
+                    transition: 'background-color 0.2s', flexShrink: 0,
+                  }}
+                >
+                  <div style={{
+                    width: '18px', height: '18px', borderRadius: '50%',
+                    backgroundColor: '#fff', position: 'absolute', top: '3px',
+                    left: emailPrefs.emailPreferences[type] ? '23px' : '3px',
+                    transition: 'left 0.2s',
+                  }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleEmailPrefsSave}
+          disabled={emailPrefsLoading || !emailPrefsHasChanges}
+          style={{
+            ...btnStyle,
+            marginTop: '16px',
+            opacity: (emailPrefsLoading || !emailPrefsHasChanges) ? 0.5 : 1,
+            cursor: (emailPrefsLoading || !emailPrefsHasChanges) ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <Save size={16} /> {emailPrefsLoading ? '저장 중...' : '저장'}
+        </button>
       </div>
     </div>
   );

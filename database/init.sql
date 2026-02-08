@@ -86,6 +86,17 @@ CREATE TABLE users (
     last_login_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- 이메일 알림 설정
+    email_notifications_enabled BOOLEAN DEFAULT false,
+    email_preferences JSONB DEFAULT '{
+        "EVENT_REMINDER": true,
+        "EVENT_UPDATED": true,
+        "EVENT_COMPLETED": true,
+        "EVENT_DELETED": true,
+        "USER_REGISTERED": true,
+        "ACCOUNT_APPROVED": true
+    }'::jsonb,
     
     -- 제약 조건
     CONSTRAINT check_admin_scope CHECK (
@@ -298,7 +309,17 @@ INSERT INTO system_settings (key, value, description) VALUES
     ('allow_past_events', 'false', '과거 일정 생성 허용'),
     ('default_alert', '"1hour"', '기본 알림 시간'),
     ('password_min_length', '4', '비밀번호 최소 길이'),
-    ('session_timeout', '60', '세션 타임아웃 (분)');
+    ('session_timeout', '60', '세션 타임아웃 (분)'),
+    ('email_enabled', 'false', '이메일 알림 활성화 여부'),
+    ('smtp_auth_type', '"LOGIN"', 'SMTP 인증 방식 (LOGIN, NONE, API_KEY)'),
+    ('smtp_host', '""', 'SMTP 서버 호스트'),
+    ('smtp_port', '587', 'SMTP 서버 포트'),
+    ('smtp_secure', 'false', 'SSL/TLS 사용 여부 (포트 465인 경우 true)'),
+    ('smtp_user', '""', 'SMTP 사용자명'),
+    ('smtp_password', '""', 'SMTP 비밀번호'),
+    ('smtp_api_key', '""', 'SMTP API 키 (SendGrid/Mailgun)'),
+    ('smtp_from_email', '""', '발신 이메일 주소'),
+    ('smtp_from_name', '"업무일정 관리 시스템"', '발신자 이름');
 
 -- ========================================
 -- 7. 세션 테이블 (JWT 대신 사용 가능)
