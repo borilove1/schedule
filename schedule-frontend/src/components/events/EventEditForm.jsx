@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Share2, ChevronDown, Repeat } from 'lucide-react';
+import { Share2, ChevronDown } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
 import ErrorAlert from '../common/ErrorAlert';
@@ -8,7 +8,7 @@ export default function EventEditForm({
   formData, onChange, onSubmit, onCancel, editType, event, loading, actionInProgress, error,
   offices = [], selectedOfficeIds = [], onOfficeToggle, onRecurringToggle, rateLimitCountdown = 0
 }) {
-  const { isDarkMode, inputBg, borderColor, textColor, cardBg, bgColor, secondaryTextColor } = useThemeColors();
+  const { isDarkMode, borderColor, textColor, cardBg, bgColor, secondaryTextColor } = useThemeColors();
   const { inputStyle, labelStyle, fontFamily } = useCommonStyles();
   const [showOfficeDropdown, setShowOfficeDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
