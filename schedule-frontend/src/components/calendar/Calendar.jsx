@@ -27,9 +27,11 @@ export default function Calendar() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [selectedTab, setSelectedTab] = useState('all');
+  const [loadError, setLoadError] = useState('');
 
   const loadEvents = useCallback(async () => {
     setEventsLoading(true);
+    setLoadError('');
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -59,6 +61,11 @@ export default function Calendar() {
       setEvents(loaded);
     } catch (err) {
       console.error('Failed to load events:', err);
+      const msg = err.message || '';
+      if (msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT')) {
+        setLoadError('요청이 너무 많습니다. 잠시 후 자동으로 새로고침됩니다.');
+        setTimeout(() => loadEvents(), 10000);
+      }
     } finally {
       setEventsLoading(false);
     }
@@ -135,6 +142,15 @@ export default function Calendar() {
         onEventClick={handleEventClick}
         userId={user?.id}
       />
+
+      {loadError && (
+        <div style={{
+          padding: '10px 16px', marginTop: '8px', borderRadius: '8px',
+          backgroundColor: '#fef3c7', color: '#92400e', fontSize: '13px', textAlign: 'center',
+        }}>
+          {loadError}
+        </div>
+      )}
 
       {eventsLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>

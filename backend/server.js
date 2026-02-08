@@ -70,7 +70,7 @@ const authLimiter = rateLimit({
 app.use('/api/v1/auth', authLimiter);
 
 const eventsLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
+  windowMs: 10 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,

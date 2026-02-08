@@ -209,7 +209,13 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
 
   // ESC 키로 모달 닫기
   const handleEsc = useCallback((e) => {
-    if (e.key === 'Escape' && !activeDialog) onClose();
+    if (e.key === 'Escape') {
+      if (activeDialog) {
+        setActiveDialog(null);
+      } else {
+        onClose();
+      }
+    }
   }, [onClose, activeDialog]);
 
   useEffect(() => {
