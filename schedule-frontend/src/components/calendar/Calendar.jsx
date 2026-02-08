@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -27,11 +27,30 @@ export default function Calendar() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [selectedTab, setSelectedTab] = useState('all');
-  const [loadError, setLoadError] = useState('');
+  const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
+  const countdownRef = useRef(null);
+
+  const startCountdown = useCallback((seconds) => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setRateLimitCountdown(seconds);
+    countdownRef.current = setInterval(() => {
+      setRateLimitCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, []);
 
   const loadEvents = useCallback(async () => {
     setEventsLoading(true);
-    setLoadError('');
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -59,17 +78,19 @@ export default function Calendar() {
         return ev;
       });
       setEvents(loaded);
+      setRateLimitCountdown(0);
+      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
     } catch (err) {
       console.error('Failed to load events:', err);
       const msg = err.message || '';
       if (msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT')) {
-        setLoadError('요청이 너무 많습니다. 잠시 후 자동으로 새로고침됩니다.');
-        setTimeout(() => loadEvents(), 10000);
+        startCountdown(30);
+        setTimeout(() => loadEvents(), 30000);
       }
     } finally {
       setEventsLoading(false);
     }
-  }, [currentDate]);
+  }, [currentDate, startCountdown]);
 
   useEffect(() => {
     loadEvents();
@@ -143,12 +164,20 @@ export default function Calendar() {
         userId={user?.id}
       />
 
-      {loadError && (
+      {rateLimitCountdown > 0 && (
         <div style={{
           padding: '10px 16px', marginTop: '8px', borderRadius: '8px',
           backgroundColor: '#fef3c7', color: '#92400e', fontSize: '13px', textAlign: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
         }}>
-          {loadError}
+          <span>요청이 너무 많습니다. 잠시 후 자동으로 새로고침됩니다.</span>
+          <span style={{
+            fontWeight: '700', fontSize: '14px', backgroundColor: '#f59e0b',
+            color: '#fff', borderRadius: '12px', padding: '2px 10px', minWidth: '28px',
+            textAlign: 'center', display: 'inline-block',
+          }}>
+            {rateLimitCountdown}
+          </span>
         </div>
       )}
 
