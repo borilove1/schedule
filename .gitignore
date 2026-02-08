@@ -12,4 +12,10 @@ npm-debug.log*
 
 # 테스트/임시 파일
 *.log
+*.png
+tmp_*
+nul
 .playwright-mcp/
+
+# 부하테스트 생성 토큰 (보안)
+load-tests/**/tokens-*.csv

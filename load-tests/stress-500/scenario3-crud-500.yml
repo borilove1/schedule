@@ -1,0 +1,59 @@
+# 시나리오 3: 500명 동시 CRUD 부하테스트
+# DB 트랜잭션 경합 및 동시 쓰기 부하 확인
+config:
+  target: "http://localhost:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 10
+      name: "Warm up (10 req/s)"
+    - duration: 20
+      arrivalRate: 25
+      name: "Sustained (25 req/s, ~500 concurrent)"
+    - duration: 10
+      arrivalRate: 50
+      name: "Peak (50 req/s)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  variables:
+    token:
+      - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc3MDUyNzM5MSwiZXhwIjoxNzcwNjEzNzkxfQ.Icz92X_5wImM-MO0VI1j17z6C3gOuQYeyftoAKlxJQo"
+
+scenarios:
+  - name: "CRUD lifecycle - 500 concurrent"
+    flow:
+      # 일정 생성
+      - post:
+          url: "/api/v1/events"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            title: "부하테스트500 {{ $randomNumber(1, 99999) }}"
+            content: "Artillery 500명 부하테스트"
+            startAt: "2026-03-20T09:00:00"
+            endAt: "2026-03-20T10:00:00"
+            isRecurring: false
+            alert: "none"
+          capture:
+            - json: "$.data.event.id"
+              as: "eventId"
+      # 일정 조회
+      - get:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 일정 수정
+      - put:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            title: "수정됨500 {{ $randomNumber(1, 99999) }}"
+            content: "수정된 내용"
+            startAt: "2026-03-20T10:00:00"
+            endAt: "2026-03-20T11:00:00"
+      # 일정 삭제
+      - delete:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"

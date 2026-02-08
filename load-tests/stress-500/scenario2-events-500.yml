@@ -1,0 +1,40 @@
+# 시나리오 2: 500명 동시 일정 조회 부하테스트
+# generateOccurrencesFromSeries() 반복 일정 확장 성능 확인
+# 사전 발급 토큰 사용 (Rate Limit 우회)
+config:
+  target: "http://localhost:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 20
+      name: "Warm up (20 req/s)"
+    - duration: 20
+      arrivalRate: 50
+      name: "Sustained (50 req/s, ~500 concurrent)"
+    - duration: 10
+      arrivalRate: 100
+      name: "Peak (100 req/s)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  variables:
+    token:
+      - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc3MDUyNzM5MSwiZXhwIjoxNzcwNjEzNzkxfQ.Icz92X_5wImM-MO0VI1j17z6C3gOuQYeyftoAKlxJQo"
+
+scenarios:
+  - name: "Events query - 500 concurrent users"
+    flow:
+      # 현재 월 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-02-01&endDate=2026-02-28"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 이전 월 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-01-01&endDate=2026-01-31"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 3개월 범위 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-01-01&endDate=2026-03-31"
+          headers:
+            Authorization: "Bearer {{ token }}"

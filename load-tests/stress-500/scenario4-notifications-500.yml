@@ -1,0 +1,40 @@
+# 시나리오 4: 500명 동시 알림 폴링 부하테스트
+# 500명이 60초마다 폴링하는 상황 시뮬레이션
+config:
+  target: "http://localhost:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 20
+      name: "Warm up (20 req/s)"
+    - duration: 30
+      arrivalRate: 50
+      name: "Sustained (50 req/s, ~500 polling users)"
+    - duration: 10
+      arrivalRate: 100
+      name: "Peak burst (100 req/s)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  variables:
+    token:
+      - "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc3MDUyNzM5MSwiZXhwIjoxNzcwNjEzNzkxfQ.Icz92X_5wImM-MO0VI1j17z6C3gOuQYeyftoAKlxJQo"
+
+scenarios:
+  - name: "Notification polling - 500 users"
+    flow:
+      # 읽지 않은 알림 수
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 알림 목록
+      - get:
+          url: "/api/v1/notifications?limit=20"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 1초 대기 후 다시 폴링
+      - think: 1
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"

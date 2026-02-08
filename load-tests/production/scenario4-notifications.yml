@@ -1,0 +1,32 @@
+# 시나리오 4 (강화): 알림 폴링 - 운영 서버
+# 사전 토큰 사용으로 auth rate limit 우회
+config:
+  target: "http://1.215.38.118:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 20
+      name: "Warm up (20 req/s)"
+    - duration: 20
+      arrivalRate: 60
+      name: "Heavy load (60 req/s)"
+    - duration: 15
+      arrivalRate: 120
+      name: "Stress test (120 req/s)"
+    - duration: 10
+      arrivalRate: 40
+      name: "Cool down (40 req/s)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3MDQ3NzI1MSwiZXhwIjoxNzcxMDgyMDUxfQ.fDm6IdoJ3EPGJiJJFmeNKRNvbBM3jQttr0hPXdOVKI4"
+
+scenarios:
+  - name: "Notification polling simulation"
+    flow:
+      - get:
+          url: "/api/v1/notifications/unread-count"
+      - get:
+          url: "/api/v1/notifications?limit=20"
+      - think: 1
+      - get:
+          url: "/api/v1/notifications/unread-count"

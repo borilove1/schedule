@@ -1,0 +1,33 @@
+# 시나리오 2 (강화): 반복 일정 조회 - 운영 서버
+# 사전 토큰 사용으로 auth rate limit 우회
+config:
+  target: "http://1.215.38.118:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 10
+      name: "Warm up (10 req/s)"
+    - duration: 20
+      arrivalRate: 40
+      name: "Heavy load (40 req/s)"
+    - duration: 15
+      arrivalRate: 80
+      name: "Stress test (80 req/s)"
+    - duration: 10
+      arrivalRate: 30
+      name: "Cool down (30 req/s)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3MDQ3NzI1MSwiZXhwIjoxNzcxMDgyMDUxfQ.fDm6IdoJ3EPGJiJJFmeNKRNvbBM3jQttr0hPXdOVKI4"
+
+scenarios:
+  - name: "Query events for multiple date ranges"
+    flow:
+      - get:
+          url: "/api/v1/events?startDate=2026-02-01&endDate=2026-02-28"
+      - get:
+          url: "/api/v1/events?startDate=2026-01-01&endDate=2026-01-31"
+      - get:
+          url: "/api/v1/events?startDate=2026-01-01&endDate=2026-03-31"
+      - get:
+          url: "/api/v1/events?startDate=2025-01-01&endDate=2026-12-31"

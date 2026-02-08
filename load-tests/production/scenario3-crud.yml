@@ -1,0 +1,50 @@
+# 시나리오 3 (강화): CRUD 동시 실행 - 운영 서버
+# 사전 토큰 사용으로 auth rate limit 우회
+config:
+  target: "http://1.215.38.118:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 5
+      name: "Warm up (5 req/s)"
+    - duration: 20
+      arrivalRate: 20
+      name: "Heavy load (20 req/s)"
+    - duration: 15
+      arrivalRate: 40
+      name: "Stress test (40 req/s)"
+    - duration: 10
+      arrivalRate: 15
+      name: "Cool down (15 req/s)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3MDQ3NzI1MSwiZXhwIjoxNzcxMDgyMDUxfQ.fDm6IdoJ3EPGJiJJFmeNKRNvbBM3jQttr0hPXdOVKI4"
+
+scenarios:
+  - name: "Create, read, update, delete events"
+    flow:
+      - post:
+          url: "/api/v1/events"
+          json:
+            title: "부하테스트 일정 {{ $randomNumber(1, 9999) }}"
+            content: "Artillery 부하테스트로 생성된 일정입니다"
+            startAt: "2026-02-20T09:00:00"
+            endAt: "2026-02-20T10:00:00"
+            isRecurring: false
+            alert: "none"
+          capture:
+            - json: "$.data.event.id"
+              as: "eventId"
+          expect:
+            - statusCode: 201
+      - get:
+          url: "/api/v1/events/{{ eventId }}"
+      - put:
+          url: "/api/v1/events/{{ eventId }}"
+          json:
+            title: "수정됨 - 부하테스트 일정"
+            content: "수정된 내용입니다"
+            startAt: "2026-02-20T10:00:00"
+            endAt: "2026-02-20T11:00:00"
+      - delete:
+          url: "/api/v1/events/{{ eventId }}"

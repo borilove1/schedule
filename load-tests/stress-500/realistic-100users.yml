@@ -1,0 +1,149 @@
+# 실제 100명 사용자 시뮬레이션 부하테스트
+# 각 VU가 서로 다른 계정으로 로그인하여 실제 업무 패턴 수행
+# 19개 부서에 분산된 100명이 동시에 접속하는 상황
+config:
+  target: "http://localhost:8080"
+  phases:
+    # Phase 1: 출근 시간 - 100명이 5분 내 순차 로그인
+    - duration: 30
+      arrivalRate: 3
+      name: "출근 로그인 (3 req/s, ~100명 순차 접속)"
+    # Phase 2: 업무 시간 - 동시 조회/생성
+    - duration: 30
+      arrivalRate: 5
+      name: "업무 시간 (5 req/s, 동시 작업)"
+    # Phase 3: 피크 - 회의 전 일괄 확인
+    - duration: 20
+      arrivalRate: 10
+      name: "피크 시간 (10 req/s, 100명 동시 활동)"
+  payload:
+    path: "users-100.csv"
+    fields:
+      - "email"
+      - "password"
+    order: "sequence"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  # 시나리오 A: 일반 조회 사용자 (60%)
+  - name: "일반 사용자 - 로그인 후 캘린더 조회"
+    weight: 60
+    flow:
+      # 1. 로그인
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "token"
+      # 2. 이번 달 일정 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-02-01&endDate=2026-02-28"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 3. 알림 개수 확인
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 4. 읽는 시간 (3~5초)
+      - think: 4
+      # 5. 다음 달 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-03-01&endDate=2026-03-31"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 6. 알림 목록 확인
+      - get:
+          url: "/api/v1/notifications?limit=20"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  # 시나리오 B: 일정 생성 사용자 (25%)
+  - name: "활발한 사용자 - 일정 생성 + 조회"
+    weight: 25
+    flow:
+      # 1. 로그인
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "token"
+      # 2. 이번 달 일정 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-02-01&endDate=2026-02-28"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 3. 일정 생성
+      - post:
+          url: "/api/v1/events"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            title: "업무 일정 {{ $randomNumber(1, 9999) }}"
+            content: "부하테스트 생성 일정"
+            startAt: "2026-03-15T09:00:00"
+            endAt: "2026-03-15T10:00:00"
+            isRecurring: false
+            alert: "none"
+          capture:
+            - json: "$.data.event.id"
+              as: "eventId"
+      # 4. 생성한 일정 상세 조회
+      - get:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 5. 잠시 확인 (2초)
+      - think: 2
+      # 6. 알림 확인
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 7. 일정 삭제 (정리)
+      - delete:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  # 시나리오 C: 알림 폴링 사용자 (15%)
+  - name: "백그라운드 - 알림만 폴링"
+    weight: 15
+    flow:
+      # 1. 로그인
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "token"
+      # 2~5. 60초 간격 폴링 시뮬레이션 (축소)
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      - get:
+          url: "/api/v1/notifications?limit=20"
+          headers:
+            Authorization: "Bearer {{ token }}"

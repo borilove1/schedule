@@ -1,0 +1,140 @@
+# 실제 100명 사용자 시뮬레이션 부하테스트 v2
+# 사전 인증된 100명이 동시에 업무를 수행하는 상황
+# 각 유저가 서로 다른 부서 소속 → 실제 scope 필터링 부하 포함
+config:
+  target: "http://localhost:8080"
+  phases:
+    # Phase 1: 출근 시간 - 점진적 접속
+    - duration: 20
+      arrivalRate: 5
+      name: "출근 시간 (5 req/s, 100명 점진 접속)"
+    # Phase 2: 업무 시간 - 안정적 동시 활동
+    - duration: 30
+      arrivalRate: 10
+      name: "업무 시간 (10 req/s, 100명 동시 활동)"
+    # Phase 3: 피크 - 회의 전 일괄 조회
+    - duration: 20
+      arrivalRate: 20
+      name: "피크 시간 (20 req/s, 200명 분량)"
+  payload:
+    path: "tokens-100.csv"
+    fields:
+      - "token"
+    order: "sequence"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  # 시나리오 A: 캘린더 조회 (60%) - 일반 조회만 하는 사용자
+  - name: "일반 사용자 - 캘린더 조회"
+    weight: 60
+    flow:
+      # 이번 달 일정 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-02-01&endDate=2026-02-28"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 생각 시간 (3~5초)
+      - think: 4
+      # 다음 달 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-03-01&endDate=2026-03-31"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 알림 폴링
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      # 3개월 범위 조회 (무거운 쿼리)
+      - get:
+          url: "/api/v1/events?startDate=2026-01-01&endDate=2026-03-31"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 알림 목록
+      - get:
+          url: "/api/v1/notifications?limit=20"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  # 시나리오 B: 일정 CRUD (25%) - 적극적 사용자
+  - name: "활발한 사용자 - 일정 생성/수정/삭제"
+    weight: 25
+    flow:
+      # 이번 달 일정 조회
+      - get:
+          url: "/api/v1/events?startDate=2026-02-01&endDate=2026-02-28"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 일정 생성
+      - post:
+          url: "/api/v1/events"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            title: "업무 {{ $randomNumber(1, 9999) }}"
+            content: "부하테스트 일정입니다"
+            startAt: "2026-03-15T09:00:00"
+            endAt: "2026-03-15T10:00:00"
+            isRecurring: false
+            alert: "none"
+          capture:
+            - json: "$.data.event.id"
+              as: "eventId"
+      - think: 2
+      # 생성한 일정 상세 조회
+      - get:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 일정 수정
+      - put:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            title: "수정 {{ $randomNumber(1, 9999) }}"
+            content: "수정된 내용"
+            startAt: "2026-03-15T10:00:00"
+            endAt: "2026-03-15T11:00:00"
+      - think: 1
+      # 알림 확인
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      # 일정 삭제
+      - delete:
+          url: "/api/v1/events/{{ eventId }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  # 시나리오 C: 알림 중심 (15%) - 백그라운드 폴링
+  - name: "백그라운드 - 알림 폴링 + 조직 조회"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      - get:
+          url: "/api/v1/notifications?limit=20"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 3
+      # 조직 구조 조회 (비인증)
+      - get:
+          url: "/api/v1/organizations/structure"
+      - think: 3
+      - get:
+          url: "/api/v1/notifications/unread-count"
+          headers:
+            Authorization: "Bearer {{ token }}"
