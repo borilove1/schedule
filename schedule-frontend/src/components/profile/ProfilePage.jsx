@@ -133,7 +133,7 @@ function CustomSelect({ value, onChange, options, placeholder, disabled, colors,
 
 export default function ProfilePage({ onBack }) {
   const { user, updateProfile } = useAuth();
-  const { pushSupported, pushSubscribed, setPushSubscribed } = useNotification();
+  const { pushSupported, pushSubscribed, setPushSubscribed, pushDebugInfo } = useNotification();
   const [pushLoading, setPushLoading] = useState(false);
   const [pushError, setPushError] = useState('');
   const colors = useThemeColors();
@@ -698,7 +698,7 @@ export default function ProfilePage({ onBack }) {
       {/* 푸시 알림 설정 */}
       <div style={{ ...sectionStyle, opacity: pushSupported ? 1 : 0.7 }}>
         <div style={sectionTitleStyle}>
-          <Bell size={18} /> 푸시 알림
+          <Bell size={18} /> 푸시 알림 (모바일 전용)
         </div>
 
         {!pushSupported ? (
@@ -707,10 +707,23 @@ export default function ProfilePage({ onBack }) {
             backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
             border: `1px solid ${borderColor}`,
             color: secondaryTextColor,
-            display: 'flex', alignItems: 'center', gap: '10px',
+            display: 'flex', flexDirection: 'column', gap: '10px',
           }}>
-            <Bell size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-            <span>이 브라우저에서는 푸시 알림을 지원하지 않습니다. Chrome, Edge, Firefox 등의 브라우저를 사용하거나 홈 화면에 앱을 추가한 뒤 이용해주세요.</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Bell size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+              <span>이 브라우저에서는 푸시 알림을 지원하지 않습니다. 홈 화면에 앱을 추가한 뒤 이용해주세요.</span>
+            </div>
+            {pushDebugInfo && (
+              <div style={{
+                marginTop: '4px', padding: '10px', borderRadius: '6px', fontSize: '11px',
+                fontFamily: 'monospace', lineHeight: '1.6', whiteSpace: 'pre-wrap',
+                backgroundColor: isDarkMode ? '#0f172a' : '#f1f5f9',
+                border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}`,
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+              }}>
+                {Object.entries(pushDebugInfo).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}
+              </div>
+            )}
           </div>
         ) : (
           <>
