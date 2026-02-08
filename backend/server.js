@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
-const cron = require('node-cron');
+const PgBoss = require('pg-boss');
 const rateLimit = require('express-rate-limit');
 
 // 라우터 임포트
@@ -20,7 +20,12 @@ const notificationRoutes = require('./routes/notifications');
 const errorHandler = require('./middleware/errorHandler');
 
 // 서비스 임포트
-const { checkAllUpcomingEvents } = require('./src/utils/reminderService');
+const {
+  setBoss,
+  processEventReminder,
+  scheduleSeriesReminders,
+  scheduleExistingEvents,
+} = require('./src/utils/reminderQueueService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -153,7 +158,7 @@ app.use(errorHandler);
 
 // ========== 서버 시작 ==========
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`
 ╔═══════════════════════════════════════════╗
 ║   업무일정 관리 시스템 API 서버          ║
@@ -164,44 +169,57 @@ app.listen(PORT, () => {
 ╚═══════════════════════════════════════════╝
   `);
 
-  // ========== Cron Jobs 시작 ==========
+  // ========== pg-boss 큐 시스템 시작 ==========
+  try {
+    const boss = new PgBoss({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT) || 5432,
+      database: process.env.DB_NAME || 'schedule_management',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD,
+      schema: 'pgboss',
+      monitorStateIntervalSeconds: 30,
+    });
 
-  // 일정 리마인더 체크 - 매시간 정각에 실행
-  cron.schedule('0 * * * *', async () => {
-    console.log('[Cron] Checking upcoming events for reminders...');
-    try {
-      const result = await checkAllUpcomingEvents(24); // 24시간 이내 일정 체크
-      console.log(`[Cron] Reminder check completed: ${result.totalCount} notifications created`);
-    } catch (error) {
-      console.error('[Cron] Failed to check reminders:', error);
-    }
-  });
+    boss.on('error', (error) => {
+      console.error('[pg-boss] Error:', error.message);
+    });
 
-  // 추가: 매일 오전 9시에도 체크 (중요한 알림을 놓치지 않도록)
-  cron.schedule('0 9 * * *', async () => {
-    console.log('[Cron] Daily reminder check at 9 AM...');
-    try {
-      const result = await checkAllUpcomingEvents(24);
-      console.log(`[Cron] Daily reminder check completed: ${result.totalCount} notifications created`);
-    } catch (error) {
-      console.error('[Cron] Failed to check daily reminders:', error);
-    }
-  });
+    await boss.start();
+    setBoss(boss);
 
-  console.log('✅ Cron jobs started:');
-  console.log('   - Hourly reminder check: 0 * * * * (every hour)');
-  console.log('   - Daily reminder check: 0 9 * * * (9 AM daily)');
-});
+    // 이벤트 리마인더 워커 등록
+    await boss.work('event-reminder', { teamConcurrency: 5 }, processEventReminder);
 
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM 신호를 받았습니다. 서버를 종료합니다...');
-  process.exit(0);
-});
+    // 반복 일정 스케줄러 (매일 자정 + 정오 실행)
+    await boss.schedule('series-reminder-scheduler', '0 0,12 * * *');
+    await boss.work('series-reminder-scheduler', async () => {
+      console.log('[pg-boss] Running series reminder scheduler...');
+      await scheduleSeriesReminders();
+    });
 
-process.on('SIGINT', () => {
-  console.log('\nSIGINT 신호를 받았습니다. 서버를 종료합니다...');
-  process.exit(0);
+    // 서버 시작 시 초기 스케줄링
+    await scheduleExistingEvents();
+    await scheduleSeriesReminders();
+
+    console.log('✅ pg-boss 큐 시스템 시작됨:');
+    console.log('   - event-reminder 워커 등록 완료');
+    console.log('   - 반복 일정 스케줄러: 0 0,12 * * * (자정/정오)');
+
+    // Graceful shutdown 시 pg-boss 종료
+    const gracefulShutdown = async (signal) => {
+      console.log(`\n${signal} 신호를 받았습니다. 서버를 종료합니다...`);
+      await boss.stop({ graceful: true, timeout: 10000 });
+      process.exit(0);
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  } catch (error) {
+    console.error('❌ pg-boss 시작 실패:', error.message);
+    console.log('⚠️  알림 큐 없이 서버 실행됩니다.');
+  }
 });
 
 module.exports = app;

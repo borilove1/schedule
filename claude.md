@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **프론트엔드**: React 18 (CRA) / lucide-react (아이콘)
 - **인증**: JWT (jsonwebtoken) + bcrypt (12 rounds)
 - **보안**: helmet (CSP/HSTS), cors (명시적 whitelist), express-rate-limit (4단계), express-validator, compression
-- **알림**: node-cron 기반 리마인더 + 인앱 알림
+- **알림**: pg-boss 9 (PostgreSQL 기반 큐) 리마인더 + 인앱 알림
 - **배포**: Docker Compose (3 컨테이너: backend, frontend, database)
 - **배포 경로**: `/var/www/schedule-app`
 - **프로덕션 URL**: `https://1.215.38.118`
@@ -26,7 +26,7 @@ schedule/
 ├── .env.example                        # 환경변수 템플릿 (민감 정보 제외)
 │
 ├── backend/
-│   ├── server.js                       # Express 진입점 + 보안 설정 + Rate Limit + Cron jobs
+│   ├── server.js                       # Express 진입점 + 보안 설정 + Rate Limit + pg-boss 큐 초기화
 │   ├── Dockerfile                      # node:18-alpine, production 빌드
 │   ├── package.json
 │   ├── .env                            # 백엔드 환경변수 (⚠️ .gitignore 대상)
@@ -43,14 +43,14 @@ schedule/
 │   │   ├── organizations.js            # 조직 구조 CRUD (본부/처/부서)
 │   │   ├── comments.js                 # 댓글 조회/CRUD + 댓글 알림 + 입력 검증 (2000자)
 │   │   ├── notifications.js            # 알림 조회/읽음/삭제/리마인더체크
-│   │   └── settings.js                 # 시스템 설정 (ADMIN 전용)
+│   │   └── settings.js                 # 시스템 설정 (ADMIN 전용) + reminder_times 변경 시 큐 재스케줄링
 │   └── src/
 │       ├── controllers/
-│       │   ├── eventController.js      # 일정 CRUD + 반복 일정 처리 + 공유 (핵심, ~1400줄)
+│       │   ├── eventController.js      # 일정 CRUD + 반복 일정 처리 + 공유 + 큐 연동 (핵심, ~1450줄)
 │       │   └── notificationController.js # 알림 CRUD + createNotification 헬퍼
 │       └── utils/
 │           ├── recurringEvents.js      # 반복 일정 확장 로직 (duration_days 지원)
-│           └── reminderService.js      # Cron 기반 마감 임박 알림 생성
+│           └── reminderQueueService.js # pg-boss 큐 기반 리마인더 스케줄링/취소/재스케줄링
 │
 ├── schedule-frontend/
 │   ├── Dockerfile                      # node:18-alpine 빌드 → nginx:alpine
@@ -104,7 +104,7 @@ schedule/
 │       │   │   ├── UserDetailModal.jsx  # 사용자 상세/수정 모달 (직급→역할 자동매핑)
 │       │   │   ├── OrganizationManagement.jsx # 본부/처/부서 트리 관리
 │       │   │   ├── OrgNodeEditModal.jsx # 조직 노드 편집 모달
-│       │   │   └── SystemSettings.jsx   # 시스템 설정 관리 (6개 항목)
+│       │   │   └── SystemSettings.jsx   # 시스템 설정 관리 (7개 항목, multiSelect 타입 포함)
 │       │   └── profile/
 │       │       └── ProfilePage.jsx      # 내 정보 수정 (기본정보 + 비밀번호 변경)
 │       └── utils/
@@ -186,7 +186,7 @@ schedule/
 ### 시드 데이터
 - 부산울산본부 1개, 20개 처/실/지사, 19개 부서 (기획관리실 4, 전력사업처 7, 전력관리처 8)
 - 기본 관리자: `admin@admin.com` / `admin1234`
-- 시스템 설정 기본값 6개
+- 시스템 설정 기본값 7개 (reminder_times 포함)
 
 ## 핵심 아키텍처
 
@@ -238,14 +238,46 @@ schedule/
 - 읽을 때 `toNaiveDateTimeString()`으로 getUTC*를 사용하여 원래 입력값 복원
 - 프론트엔드에 타임존 없는 `YYYY-MM-DDTHH:mm:ss` 문자열로 전달
 
-### 알림 시스템
-- **자동 알림**: Cron job이 매시간 + 매일 9시에 실행 → 24시간 이내 시작 일정에 리마인더 생성
+### 알림 시스템 (pg-boss 큐 기반)
+
+**큐 아키텍처:**
+- **pg-boss 9** (PostgreSQL 기반 작업 큐): 별도 인프라(Redis) 없이 기존 DB 활용
+- 서버 시작 시 `boss.start()` → `pgboss` 스키마에 작업 테이블 자동 생성
+- `event-reminder` 워커: `teamConcurrency: 5`로 동시 처리
+- `series-reminder-scheduler`: 매일 자정+정오(`0 0,12 * * *`) 반복 일정 스케줄링
+
+**리마인더 스케줄링 흐름:**
+- **단일 일정**: CRUD 시점에 `scheduleEventReminder()` → pg-boss에 지연 작업 등록 (`startAfter`)
+- **반복 일정**: daily scheduler가 48시간 이내 occurrence를 스캔 → 작업 등록
+- **알림 시간**: 시스템 설정 `reminder_times`에서 읽음 (기본: `["1hour"]`, 옵션: 30min/1hour/3hour)
+- **관리자 설정 변경**: `rescheduleAllReminders()` → 기존 대기 작업 전체 삭제 후 재스케줄링
+- **중복 방지**: `singletonKey`로 작업 고유성 보장 (예: `reminder-event-123-1hour`)
+
+**큐 연동 포인트 (eventController.js):**
+| 액션 | 큐 호출 |
+|------|---------|
+| 일정 생성 (단일) | `scheduleEventReminder(eventId, startAt, creatorId)` |
+| 일정 수정 (단일) | `cancelEventReminders(id)` → `scheduleEventReminder(...)` |
+| 일정 수정 (시리즈 "이번만") | `scheduleEventReminder(newEventId, ...)` (새 예외 이벤트) |
+| 일정 수정 (시리즈 "전체") | `cancelSeriesReminders(seriesId)` (daily scheduler가 재스케줄링) |
+| 일정 삭제 (단일) | `cancelEventReminders(id)` |
+| 일정 삭제 (시리즈 전체) | `cancelSeriesReminders(seriesId)` |
+| 일정 완료 (단일) | `cancelEventReminders(id)` |
+| 일정 완료 (시리즈 전체) | `cancelSeriesReminders(seriesId)` |
+| 완료 취소 (단일) | `scheduleEventReminder(eventId, ...)` |
+
+**워커 처리 로직 (processEventReminder):**
+1. 이벤트 아직 유효한지 확인 (삭제/완료 안됨)
+2. 반복 일정은 해당 날짜가 예외인지 추가 확인
+3. 4시간 이내 중복 알림 체크 (`metadata->>'timeKey'`)
+4. `createNotification()` 호출
+
+**기타 알림:**
 - **이벤트 알림**: 일정 생성/수정/완료/삭제 시 `createNotification()` 호출
 - **가입 알림**: 회원가입 시 ADMIN에게 USER_REGISTERED, 승인 시 사용자에게 ACCOUNT_APPROVED
 - **프론트엔드**: `NotificationContext`에서 60초마다 읽지 않은 알림 개수 폴링
 - **댓글 알림**: 댓글 작성 시 일정 작성자에게 EVENT_COMMENTED 알림 (자기 댓글 제외)
 - **알림 타입**: EVENT_REMINDER, EVENT_COMPLETED, EVENT_UPDATED, EVENT_DELETED, EVENT_COMMENTED, USER_REGISTERED, ACCOUNT_APPROVED, SYSTEM
-- **중복 방지**: 48시간 윈도우 내 동일 이벤트 리마인더 중복 생성 방지
 
 ### 댓글 시스템
 - **인라인 UI**: EventDetailView 하단에 CommentSection 컴포넌트 (구분선 아래)
@@ -353,9 +385,10 @@ schedule/
 | Method | Path | 인증 | 설명 |
 |--------|------|------|------|
 | GET | / | O (ADMIN) | 전체 설정 조회 |
-| PUT | / | O (ADMIN) | 설정 일괄 수정 |
+| PUT | / | O (ADMIN) | 설정 일괄 수정 (reminder_times 변경 시 큐 재스케줄링) |
 | GET | /:key | O (ADMIN) | 개별 설정 조회 |
 | PUT | /:key | O (ADMIN) | 개별 설정 수정 |
+| POST | /test-email | O (ADMIN) | SMTP 테스트 이메일 발송 |
 
 ## API 응답 패턴
 
@@ -421,6 +454,7 @@ schedule/
 - `buildScopeFilter()`: 역할 기반 SQL WHERE절 동적 생성
 - camelCase(프론트엔드)와 snake_case(DB) 양방향 지원
 - `getEvents()`에서 반복 일정 자동 확장 + 예외 이벤트 상태 반영 + 공유 일정 포함
+- CRUD 시 `reminderQueueService`의 `scheduleEventReminder`/`cancelEventReminders`/`cancelSeriesReminders` 호출 (큐 연동)
 
 ### 백엔드 database.js
 - `query(text, params)`: 파라미터화된 쿼리 실행 (SQL injection 방지)
@@ -564,6 +598,24 @@ SELECT * FROM event_exceptions WHERE series_id = <seriesId>;
 SELECT eso.*, o.name FROM event_shared_offices eso JOIN offices o ON eso.office_id = o.id WHERE series_id = <seriesId>;
 ```
 
+### pg-boss 큐 모니터링
+```sql
+-- 대기 중인 리마인더 작업 확인
+SELECT name, state, singletonkey, startafter FROM pgboss.job
+WHERE name = 'event-reminder' AND state = 'created' ORDER BY startafter;
+
+-- 특정 이벤트의 대기 작업 확인
+SELECT * FROM pgboss.job WHERE singletonkey LIKE 'reminder-event-123-%';
+
+-- 특정 시리즈의 대기 작업 확인
+SELECT * FROM pgboss.job WHERE name = 'event-reminder' AND state = 'created'
+AND data->>'seriesId' = '42';
+
+-- 완료/실패 작업 확인
+SELECT name, state, completedon, output FROM pgboss.job
+WHERE name = 'event-reminder' AND state IN ('completed', 'failed') ORDER BY completedon DESC LIMIT 20;
+```
+
 ### JWT 토큰 오류
 다시 로그인하여 새 토큰 발급. Authorization 헤더 형식: `Bearer <token>`
 
@@ -617,6 +669,7 @@ UPDATE users SET is_active = true, approved_at = NOW() WHERE id = <userId>;
 9. 댓글 UI 미구현 → CommentSection 인라인 컴포넌트 구현 (조회/작성/수정/삭제 + 알림 + EventList 뱃지)
 10. Rate Limit 에러 시 사용자 피드백 부족 → 모달 내 30초 카운트다운 배너 (상세/생성/수정 모달 공통, 모달 간 상태 공유)
 11. 보안 취약점 Phase 1 수정 → JWT 강화/bcrypt 12/비밀번호 특수문자/에러 노출 방지/Body 1MB/DB 포트 차단/Nginx 보안 헤더/CORS·helmet 상세 설정/댓글 검증·Rate Limit/ILIKE 이스케이핑
+12. 알림 시스템 cron → pg-boss 큐 전환: 최대 1시간 오차 문제 해결, 정확한 시간에 리마인더 발송, 관리자 설정에서 알림 시간(30분/1시간/3시간) 복수 선택 가능, node-cron 제거
 
 ## 알려진 이슈 및 남은 작업
 

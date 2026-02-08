@@ -29,7 +29,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
   const [offices, setOffices] = useState([]);
   const [selectedOfficeIds, setSelectedOfficeIds] = useState([]);
   const [formData, setFormData] = useState({
-    title: '', content: '',
+    title: '', content: '', priority: 'NORMAL',
     startDate: '', startTime: '', endDate: '', endTime: '',
     isRecurring: false, recurrenceType: 'week', recurrenceInterval: 1, recurrenceEndDate: ''
   });
@@ -67,6 +67,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
         const end = formatDateTimeForInput(data.endAt);
         setFormData({
           title: data.title || '', content: data.content || '',
+          priority: data.priority || 'NORMAL',
           startDate: start.date, startTime: start.time,
           endDate: end.date, endTime: end.time,
           isRecurring: !!(data.isRecurring || data.seriesId),
@@ -111,7 +112,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
           return;
         }
 
-        const updateData = { title: formData.title, content: formData.content, startAt, endAt, priority: 'NORMAL' };
+        const updateData = { title: formData.title, content: formData.content, startAt, endAt, priority: formData.priority || 'NORMAL' };
         updateData.sharedOfficeIds = selectedOfficeIds;
         if (eventId && String(eventId).startsWith('series-')) {
           updateData.editType = editType;

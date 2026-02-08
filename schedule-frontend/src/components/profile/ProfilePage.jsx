@@ -1,15 +1,139 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useCommonStyles } from '../../hooks/useCommonStyles';
-import { ArrowLeft, Save, Lock, CheckCircle, Mail } from 'lucide-react';
+import { ArrowLeft, Save, Lock, CheckCircle, Mail, ChevronDown } from 'lucide-react';
 import ErrorAlert from '../common/ErrorAlert';
 import api from '../../utils/api';
 
+// 커스텀 드롭다운 컴포넌트
+function CustomSelect({ value, onChange, options, placeholder, disabled, colors, dropUp, maxItems }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const ref = useRef(null);
+  const { isDarkMode, cardBg, textColor, secondaryTextColor, borderColor, inputBg } = colors;
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      const idx = options.findIndex(o => o.value === value);
+      setFocusedIdx(idx >= 0 ? idx : 0);
+    }
+  }, [isOpen, options, value]);
+
+  const selectedLabel = options.find(o => o.value === value)?.label || '';
+
+  const handleKeyDown = (e) => {
+    if (disabled) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (isOpen && focusedIdx >= 0 && focusedIdx < options.length) {
+        onChange(options[focusedIdx].value);
+        setIsOpen(false);
+      } else {
+        setIsOpen(!isOpen);
+      }
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) { setIsOpen(true); return; }
+      setFocusedIdx(prev => Math.min(prev + 1, options.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) { setIsOpen(true); return; }
+      setFocusedIdx(prev => Math.max(prev - 1, 0));
+    } else if (e.key === 'Tab') {
+      if (isOpen) setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        tabIndex={disabled ? -1 : 0}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onKeyDown={handleKeyDown}
+        style={{
+          width: '100%',
+          padding: '12px',
+          borderRadius: '12px',
+          border: `1px solid ${isOpen ? '#3B82F6' : borderColor}`,
+          backgroundColor: disabled ? (isDarkMode ? '#1a1a2e' : '#f3f4f6') : inputBg,
+          color: value ? textColor : secondaryTextColor,
+          fontSize: '14px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          boxSizing: 'border-box',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingRight: '36px',
+          position: 'relative',
+          boxShadow: isOpen ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
+          transition: 'border-color 0.2s, box-shadow 0.2s',
+          opacity: disabled ? 0.6 : 1,
+          outline: 'none',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedLabel || placeholder}
+        </span>
+        <ChevronDown size={16} style={{
+          position: 'absolute', right: '12px', top: '50%',
+          color: secondaryTextColor,
+          transform: isOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+          transition: 'transform 0.2s',
+        }} />
+      </div>
+      {isOpen && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0, zIndex: 10,
+          ...(dropUp ? { bottom: '100%', marginBottom: '4px' } : { top: '100%', marginTop: '4px' }),
+          borderRadius: '12px', border: `1px solid ${borderColor}`,
+          backgroundColor: cardBg,
+          boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
+          overflow: 'hidden',
+          maxHeight: maxItems ? `${maxItems * 40}px` : '200px',
+          overflowY: 'auto',
+        }}>
+          {options.map((opt, idx) => (
+            <div key={opt.value}
+              onClick={() => { onChange(opt.value); setIsOpen(false); }}
+              style={{
+                padding: '10px 12px', cursor: 'pointer', fontSize: '14px', color: textColor,
+                backgroundColor: idx === focusedIdx
+                  ? (isDarkMode ? '#1e293b' : '#f0f9ff')
+                  : value === opt.value ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                setFocusedIdx(idx);
+                if (value !== opt.value) e.target.style.backgroundColor = isDarkMode ? '#1e293b' : '#f5f5f5';
+              }}
+              onMouseLeave={(e) => {
+                if (idx !== focusedIdx && value !== opt.value) e.target.style.backgroundColor = 'transparent';
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage({ onBack }) {
   const { user, updateProfile } = useAuth();
-  const { isDarkMode, cardBg, textColor, secondaryTextColor, borderColor } = useThemeColors();
-  const { inputStyle, labelStyle, selectStyle } = useCommonStyles();
+  const colors = useThemeColors();
+  const { isDarkMode, cardBg, textColor, secondaryTextColor, borderColor } = colors;
+  const { inputStyle, labelStyle } = useCommonStyles();
 
   // 프로필 수정 상태
   const [profileData, setProfileData] = useState({
@@ -104,8 +228,43 @@ export default function ProfilePage({ onBack }) {
   const availableOffices = profileData.division ? (organizations.offices[profileData.division] || []) : [];
   const availableDepartments = profileData.office ? (organizations.departments[profileData.office] || []) : [];
 
+  const positionOptions = [
+    { value: '사원', label: '사원' },
+    { value: '대리', label: '대리' },
+    { value: '과장', label: '과장' },
+    { value: '차장', label: '차장' },
+    { value: '부장', label: '부장' },
+    { value: '처장', label: '처장' },
+    { value: '본부장', label: '본부장' },
+  ];
+
+  const divisionOptions = organizations.divisions.map(d => {
+    const name = typeof d === 'string' ? d : d.name;
+    return { value: name, label: name };
+  });
+
+  const officeOptions = availableOffices.map(o => {
+    const name = typeof o === 'string' ? o : o.name;
+    return { value: name, label: name };
+  });
+
+  const departmentOptions = availableDepartments.map(d => {
+    const name = typeof d === 'string' ? d : d.name;
+    return { value: name, label: name };
+  });
+
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'division') {
+      setProfileData(prev => ({ ...prev, division: value, office: '', department: '' }));
+    } else if (name === 'office') {
+      setProfileData(prev => ({ ...prev, office: value, department: '' }));
+    } else {
+      setProfileData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleCustomChange = (name, value) => {
     if (name === 'division') {
       setProfileData(prev => ({ ...prev, division: value, office: '', department: '' }));
     } else if (name === 'office') {
@@ -299,76 +458,51 @@ export default function ProfilePage({ onBack }) {
             </div>
             <div>
               <label style={labelStyle}>직급</label>
-              <select
-                name="position"
+              <CustomSelect
                 value={profileData.position}
-                onChange={handleProfileChange}
-                required
-                style={selectStyle}
-              >
-                <option value="">선택</option>
-                <option value="사원">사원</option>
-                <option value="대리">대리</option>
-                <option value="과장">과장</option>
-                <option value="차장">차장</option>
-                <option value="부장">부장</option>
-                <option value="처장">처장</option>
-                <option value="본부장">본부장</option>
-              </select>
+                onChange={(val) => handleCustomChange('position', val)}
+                options={positionOptions}
+                placeholder="선택"
+                colors={colors}
+              />
             </div>
           </div>
 
           <div style={{ marginBottom: '16px' }}>
             <label style={labelStyle}>본부</label>
-            <select
-              name="division"
+            <CustomSelect
               value={profileData.division}
-              onChange={handleProfileChange}
-              required
-              style={selectStyle}
-            >
-              <option value="">선택하세요</option>
-              {organizations.divisions.map(div => {
-                const name = typeof div === 'string' ? div : div.name;
-                return <option key={name} value={name}>{name}</option>;
-              })}
-            </select>
+              onChange={(val) => handleCustomChange('division', val)}
+              options={divisionOptions}
+              placeholder="선택하세요"
+              colors={colors}
+            />
           </div>
 
           <div style={{ marginBottom: '16px' }}>
             <label style={labelStyle}>처</label>
-            <select
-              name="office"
+            <CustomSelect
               value={profileData.office}
-              onChange={handleProfileChange}
-              required
+              onChange={(val) => handleCustomChange('office', val)}
+              options={officeOptions}
+              placeholder="선택하세요"
               disabled={!profileData.division}
-              style={selectStyle}
-            >
-              <option value="">선택하세요</option>
-              {availableOffices.map(off => {
-                const name = typeof off === 'string' ? off : off.name;
-                return <option key={name} value={name}>{name}</option>;
-              })}
-            </select>
+              colors={colors}
+              maxItems={3}
+            />
           </div>
 
           <div style={{ marginBottom: '20px' }}>
             <label style={labelStyle}>부서{availableDepartments.length > 0 ? '' : ' (해당 없음)'}</label>
-            <select
-              name="department"
+            <CustomSelect
               value={profileData.department}
-              onChange={handleProfileChange}
-              required={availableDepartments.length > 0}
+              onChange={(val) => handleCustomChange('department', val)}
+              options={departmentOptions}
+              placeholder={availableDepartments.length > 0 ? '선택하세요' : '해당 없음'}
               disabled={!profileData.office || availableDepartments.length === 0}
-              style={selectStyle}
-            >
-              <option value="">{availableDepartments.length > 0 ? '선택하세요' : '해당 없음'}</option>
-              {availableDepartments.map(dept => {
-                const name = typeof dept === 'string' ? dept : dept.name;
-                return <option key={name} value={name}>{name}</option>;
-              })}
-            </select>
+              colors={colors}
+              maxItems={3}
+            />
           </div>
 
           <button type="submit" disabled={profileLoading} style={{ ...btnStyle, opacity: profileLoading ? 0.7 : 1 }}>

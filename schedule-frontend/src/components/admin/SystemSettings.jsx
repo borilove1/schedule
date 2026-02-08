@@ -48,6 +48,16 @@ const SETTING_CONFIG = {
     type: 'number',
     unit: '분',
   },
+  reminder_times: {
+    label: '일정 시작 알림',
+    description: '일정 시작 전 알림을 보낼 시간을 선택하세요 (복수 선택 가능)',
+    type: 'multiSelect',
+    options: [
+      { value: '30min', label: '30분 전' },
+      { value: '1hour', label: '1시간 전' },
+      { value: '3hour', label: '3시간 전' },
+    ],
+  },
 
   // ===== 이메일 설정 =====
   email_enabled: {
@@ -294,6 +304,39 @@ export default function SystemSettings() {
               placeholder={config.placeholder || ''}
               style={{ ...inputStyle, width: '220px' }}
             />
+          )}
+          {config.type === 'multiSelect' && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {config.options.map(opt => {
+                const selected = Array.isArray(value) && value.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      const current = Array.isArray(value) ? [...value] : [];
+                      if (selected) {
+                        handleChange(key, current.filter(v => v !== opt.value));
+                      } else {
+                        handleChange(key, [...current, opt.value]);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '16px',
+                      border: `1px solid ${selected ? '#3B82F6' : borderColor}`,
+                      backgroundColor: selected ? (isDarkMode ? '#1e3a5f' : '#dbeafe') : 'transparent',
+                      color: selected ? '#3B82F6' : secondaryTextColor,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      fontWeight: selected ? '500' : '400',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           )}
           {config.type === 'password' && (
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>

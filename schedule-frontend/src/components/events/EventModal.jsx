@@ -37,6 +37,8 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
   const [selectedOfficeIds, setSelectedOfficeIds] = useState([]);
   const [showOfficeDropdown, setShowOfficeDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [priorityFocusedIdx, setPriorityFocusedIdx] = useState(-1);
+  const [officeFocusedIdx, setOfficeFocusedIdx] = useState(-1);
   const officeDropdownRef = useRef(null);
   const priorityDropdownRef = useRef(null);
 
@@ -251,7 +253,25 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
             <label style={labelStyle}>우선순위</label>
             <div ref={priorityDropdownRef} style={{ position: 'relative' }}>
               <div
-                onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+                tabIndex={0}
+                onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); const opts = [{ value: 'LOW' }, { value: 'NORMAL' }, { value: 'HIGH' }]; const idx = opts.findIndex(o => o.value === formData.priority); setPriorityFocusedIdx(idx >= 0 ? idx : 0); }}
+                onKeyDown={(e) => {
+                  const opts = [{ value: 'LOW', label: '낮음' }, { value: 'NORMAL', label: '보통' }, { value: 'HIGH', label: '높음' }];
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (showPriorityDropdown && priorityFocusedIdx >= 0) {
+                      setFormData({ ...formData, priority: opts[priorityFocusedIdx].value });
+                      setShowPriorityDropdown(false);
+                    } else {
+                      setShowPriorityDropdown(!showPriorityDropdown);
+                      const idx = opts.findIndex(o => o.value === formData.priority);
+                      setPriorityFocusedIdx(idx >= 0 ? idx : 0);
+                    }
+                  } else if (e.key === 'Escape') { setShowPriorityDropdown(false); }
+                  else if (e.key === 'ArrowDown') { e.preventDefault(); if (!showPriorityDropdown) { setShowPriorityDropdown(true); const idx = opts.findIndex(o => o.value === formData.priority); setPriorityFocusedIdx(idx >= 0 ? idx : 0); } else { setPriorityFocusedIdx(prev => Math.min(prev + 1, opts.length - 1)); } }
+                  else if (e.key === 'ArrowUp') { e.preventDefault(); if (!showPriorityDropdown) { setShowPriorityDropdown(true); const idx = opts.findIndex(o => o.value === formData.priority); setPriorityFocusedIdx(idx >= 0 ? idx : 0); } else { setPriorityFocusedIdx(prev => Math.max(prev - 1, 0)); } }
+                  else if (e.key === 'Tab') { if (showPriorityDropdown) setShowPriorityDropdown(false); }
+                }}
                 style={{
                   ...uniformInputStyle,
                   cursor: 'pointer',
@@ -262,6 +282,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
                   position: 'relative',
                   borderColor: showPriorityDropdown ? '#3B82F6' : borderColor,
                   boxShadow: showPriorityDropdown ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
+                  outline: 'none',
                 }}
               >
                 <span>{{ LOW: '낮음', NORMAL: '보통', HIGH: '높음' }[formData.priority]}</span>
@@ -279,16 +300,17 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
                   backgroundColor: cardBg, boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
                   overflow: 'hidden',
                 }}>
-                  {[{ value: 'LOW', label: '낮음' }, { value: 'NORMAL', label: '보통' }, { value: 'HIGH', label: '높음' }].map(opt => (
+                  {[{ value: 'LOW', label: '낮음' }, { value: 'NORMAL', label: '보통' }, { value: 'HIGH', label: '높음' }].map((opt, idx) => (
                     <div key={opt.value}
                       onClick={() => { setFormData({ ...formData, priority: opt.value }); setShowPriorityDropdown(false); }}
                       style={{
                         padding: '10px 12px', cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor,
-                        backgroundColor: formData.priority === opt.value
-                          ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent',
+                        backgroundColor: idx === priorityFocusedIdx
+                          ? (isDarkMode ? '#1e293b' : '#f0f9ff')
+                          : formData.priority === opt.value ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent',
                       }}
-                      onMouseEnter={(e) => { if (formData.priority !== opt.value) e.currentTarget.style.backgroundColor = isDarkMode ? '#1e293b' : '#f5f5f5'; }}
-                      onMouseLeave={(e) => { if (formData.priority !== opt.value) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onMouseEnter={(e) => { setPriorityFocusedIdx(idx); if (formData.priority !== opt.value) e.currentTarget.style.backgroundColor = isDarkMode ? '#1e293b' : '#f5f5f5'; }}
+                      onMouseLeave={(e) => { if (idx !== priorityFocusedIdx && formData.priority !== opt.value) e.currentTarget.style.backgroundColor = 'transparent'; }}
                     >
                       {opt.label}
                     </div>
@@ -306,7 +328,21 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
               </label>
               <div ref={officeDropdownRef} style={{ position: 'relative' }}>
                 <div
-                  onClick={() => setShowOfficeDropdown(!showOfficeDropdown)}
+                  tabIndex={0}
+                  onClick={() => { setShowOfficeDropdown(!showOfficeDropdown); setOfficeFocusedIdx(0); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (showOfficeDropdown && officeFocusedIdx >= 0 && officeFocusedIdx < offices.length) {
+                        toggleOffice(offices[officeFocusedIdx].id);
+                      } else {
+                        setShowOfficeDropdown(!showOfficeDropdown); setOfficeFocusedIdx(0);
+                      }
+                    } else if (e.key === 'Escape') { setShowOfficeDropdown(false); }
+                    else if (e.key === 'ArrowDown') { e.preventDefault(); if (!showOfficeDropdown) { setShowOfficeDropdown(true); setOfficeFocusedIdx(0); } else { setOfficeFocusedIdx(prev => Math.min(prev + 1, offices.length - 1)); } }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); if (!showOfficeDropdown) { setShowOfficeDropdown(true); setOfficeFocusedIdx(0); } else { setOfficeFocusedIdx(prev => Math.max(prev - 1, 0)); } }
+                    else if (e.key === 'Tab') { if (showOfficeDropdown) setShowOfficeDropdown(false); }
+                  }}
                   style={{
                     ...uniformInputStyle,
                     cursor: 'pointer',
@@ -320,6 +356,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
                     gap: '4px',
                     borderColor: showOfficeDropdown ? '#3B82F6' : borderColor,
                     boxShadow: showOfficeDropdown ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
+                    outline: 'none',
                   }}
                 >
                   {selectedOfficeIds.length > 0 ? (
@@ -358,13 +395,16 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
                     backgroundColor: cardBg, boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
                     maxHeight: '120px', overflowY: 'auto'
                   }}>
-                    {offices.map(office => (
+                    {offices.map((office, idx) => (
                       <label key={office.id} style={{
                         display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                         cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor,
-                        backgroundColor: selectedOfficeIds.includes(office.id)
-                          ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent'
-                      }}>
+                        backgroundColor: idx === officeFocusedIdx
+                          ? (isDarkMode ? '#1e293b' : '#f0f9ff')
+                          : selectedOfficeIds.includes(office.id) ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent'
+                      }}
+                        onMouseEnter={() => setOfficeFocusedIdx(idx)}
+                      >
                         <input
                           type="checkbox"
                           checked={selectedOfficeIds.includes(office.id)}

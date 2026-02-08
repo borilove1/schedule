@@ -10,6 +10,7 @@ import api from '../../utils/api';
 // 커스텀 드롭다운 컴포넌트
 function CustomSelect({ value, onChange, options, placeholder, disabled, colors, dropUp, maxItems }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
   const ref = useRef(null);
   const { isDarkMode, cardBg, textColor, secondaryTextColor, borderColor, inputBg } = colors;
 
@@ -21,12 +22,46 @@ function CustomSelect({ value, onChange, options, placeholder, disabled, colors,
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      const idx = options.findIndex(o => o.value === value);
+      setFocusedIdx(idx >= 0 ? idx : 0);
+    }
+  }, [isOpen, options, value]);
+
   const selectedLabel = options.find(o => o.value === value)?.label || '';
+
+  const handleKeyDown = (e) => {
+    if (disabled) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (isOpen && focusedIdx >= 0 && focusedIdx < options.length) {
+        onChange(options[focusedIdx].value);
+        setIsOpen(false);
+      } else {
+        setIsOpen(!isOpen);
+      }
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) { setIsOpen(true); return; }
+      setFocusedIdx(prev => Math.min(prev + 1, options.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) { setIsOpen(true); return; }
+      setFocusedIdx(prev => Math.max(prev - 1, 0));
+    } else if (e.key === 'Tab') {
+      if (isOpen) setIsOpen(false);
+    }
+  };
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <div
+        tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setIsOpen(!isOpen)}
+        onKeyDown={handleKeyDown}
         style={{
           width: '100%',
           padding: '12px',
@@ -45,6 +80,7 @@ function CustomSelect({ value, onChange, options, placeholder, disabled, colors,
           boxShadow: isOpen ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
           transition: 'border-color 0.2s, box-shadow 0.2s',
           opacity: disabled ? 0.6 : 1,
+          outline: 'none',
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -68,19 +104,21 @@ function CustomSelect({ value, onChange, options, placeholder, disabled, colors,
           maxHeight: maxItems ? `${maxItems * 40}px` : '200px',
           overflowY: 'auto',
         }}>
-          {options.map(opt => (
+          {options.map((opt, idx) => (
             <div key={opt.value}
               onClick={() => { onChange(opt.value); setIsOpen(false); }}
               style={{
                 padding: '10px 12px', cursor: 'pointer', fontSize: '14px', color: textColor,
-                backgroundColor: value === opt.value
-                  ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent',
+                backgroundColor: idx === focusedIdx
+                  ? (isDarkMode ? '#1e293b' : '#f0f9ff')
+                  : value === opt.value ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent',
               }}
               onMouseEnter={(e) => {
+                setFocusedIdx(idx);
                 if (value !== opt.value) e.target.style.backgroundColor = isDarkMode ? '#1e293b' : '#f5f5f5';
               }}
               onMouseLeave={(e) => {
-                if (value !== opt.value) e.target.style.backgroundColor = 'transparent';
+                if (idx !== focusedIdx && value !== opt.value) e.target.style.backgroundColor = 'transparent';
               }}
             >
               {opt.label}

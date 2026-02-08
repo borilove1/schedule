@@ -4,6 +4,11 @@
 const { query, transaction } = require('../../config/database');
 const { generateOccurrencesFromSeries } = require('../utils/recurringEvents');
 const { createNotification } = require('./notificationController');
+const {
+  scheduleEventReminder,
+  cancelEventReminders,
+  cancelSeriesReminders,
+} = require('../utils/reminderQueueService');
 
 /**
  * PG의 TIMESTAMP WITH TIME ZONE → 타임존 없는 나이브 문자열 변환
@@ -388,9 +393,18 @@ exports.createEvent = async (req, res) => {
         return eventResult;
       });
 
+      const newEvent = result.rows[0];
+
+      // 큐에 리마인더 스케줄링
+      try {
+        await scheduleEventReminder(newEvent.id, newEvent.start_at, userId);
+      } catch (qErr) {
+        console.error('[Queue] Failed to schedule reminder:', qErr.message);
+      }
+
       res.status(201).json({
         success: true,
-        data: { event: formatEventRow(result.rows[0]) }
+        data: { event: formatEventRow(newEvent) }
       });
     }
   } catch (error) {
@@ -500,6 +514,13 @@ exports.updateEvent = async (req, res) => {
 
         const updatedEvent = result.rows[0];
 
+        // 큐에 리마인더 스케줄링 (새 예외 이벤트)
+        try {
+          await scheduleEventReminder(updatedEvent.id, updatedEvent.start_at, userId);
+        } catch (qErr) {
+          console.error('[Queue] Failed to schedule reminder:', qErr.message);
+        }
+
         // 알림 생성
         try {
           await createNotification(
@@ -587,6 +608,13 @@ exports.updateEvent = async (req, res) => {
         });
 
         const updatedSeries = result.rows[0];
+
+        // 시리즈 리마인더 재스케줄링 (시간 변경 시 daily scheduler가 처리)
+        try {
+          await cancelSeriesReminders(seriesId);
+        } catch (qErr) {
+          console.error('[Queue] Failed to cancel series reminders:', qErr.message);
+        }
 
         // 알림 생성
         try {
@@ -774,6 +802,14 @@ exports.updateEvent = async (req, res) => {
 
       const updatedEvent = result.rows[0];
 
+      // 큐 리마인더 재스케줄링
+      try {
+        await cancelEventReminders(id);
+        await scheduleEventReminder(id, updatedEvent.start_at, userId);
+      } catch (qErr) {
+        console.error('[Queue] Failed to reschedule reminder:', qErr.message);
+      }
+
       // 알림 생성
       try {
         await createNotification(
@@ -857,6 +893,13 @@ exports.deleteEvent = async (req, res) => {
 
         return res.json({ success: true, message: 'Event occurrence deleted' });
       } else if (actualDeleteType === 'series') {
+        // 시리즈 리마인더 취소
+        try {
+          await cancelSeriesReminders(seriesId);
+        } catch (qErr) {
+          console.error('[Queue] Failed to cancel series reminders:', qErr.message);
+        }
+
         // 전체 반복 일정 삭제 (CASCADE로 event_shared_offices 자동 삭제)
         await transaction(async (client) => {
           await client.query('DELETE FROM event_series WHERE id = $1', [seriesId]);
@@ -917,6 +960,13 @@ exports.deleteEvent = async (req, res) => {
 
       return res.json({ success: true, message: 'Event occurrence deleted' });
     } else if (originalEvent.series_id && actualDeleteType === 'series') {
+      // 시리즈 리마인더 취소
+      try {
+        await cancelSeriesReminders(originalEvent.series_id);
+      } catch (qErr) {
+        console.error('[Queue] Failed to cancel series reminders:', qErr.message);
+      }
+
       // 전체 반복 일정 삭제
       await transaction(async (client) => {
         await client.query('DELETE FROM event_series WHERE id = $1', [originalEvent.series_id]);
@@ -939,6 +989,13 @@ exports.deleteEvent = async (req, res) => {
     } else {
       // 일반 일정 삭제
       const eventTitle = originalEvent.title;
+
+      // 이벤트 리마인더 취소
+      try {
+        await cancelEventReminders(id);
+      } catch (qErr) {
+        console.error('[Queue] Failed to cancel event reminders:', qErr.message);
+      }
 
       await query('DELETE FROM events WHERE id = $1', [id]);
 
@@ -1189,6 +1246,13 @@ exports.completeEvent = async (req, res) => {
 
       // 전체 완료: 시리즈 상태를 DONE으로 변경 + 기존 예외 이벤트도 DONE으로
       if (completeType === 'all') {
+        // 시리즈 리마인더 취소
+        try {
+          await cancelSeriesReminders(seriesId);
+        } catch (qErr) {
+          console.error('[Queue] Failed to cancel series reminders:', qErr.message);
+        }
+
         await transaction(async (client) => {
           await client.query(
             `UPDATE event_series SET status = 'DONE', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -1295,6 +1359,13 @@ exports.completeEvent = async (req, res) => {
     }
     if (!canEditEvent(req.user, checkResult.rows[0])) {
       return res.status(403).json({ success: false, message: '권한이 없습니다.' });
+    }
+
+    // 이벤트 리마인더 취소
+    try {
+      await cancelEventReminders(id);
+    } catch (qErr) {
+      console.error('[Queue] Failed to cancel event reminders:', qErr.message);
     }
 
     const completeQuery = `
@@ -1411,10 +1482,19 @@ exports.uncompleteEvent = async (req, res) => {
       [id]
     );
 
+    const event = result.rows[0];
+
+    // 완료 취소된 이벤트에 리마인더 재스케줄링
+    try {
+      await scheduleEventReminder(event.id, event.start_at, event.creator_id);
+    } catch (qErr) {
+      console.error('[Queue] Failed to reschedule reminder:', qErr.message);
+    }
+
     res.json({
       success: true,
       message: 'Event uncompleted',
-      data: { event: formatEventRow(result.rows[0]) }
+      data: { event: formatEventRow(event) }
     });
   } catch (error) {
     console.error('Uncomplete event error:', error);

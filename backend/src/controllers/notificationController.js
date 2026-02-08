@@ -240,15 +240,15 @@ async function sendEmailNotification(userId, type, title, message) {
  */
 exports.checkReminders = async (req, res) => {
   try {
-    const { hoursAhead = 24 } = req.body;
-    const { checkAllUpcomingEvents } = require('../utils/reminderService');
+    const { scheduleExistingEvents, scheduleSeriesReminders } = require('../utils/reminderQueueService');
 
-    const result = await checkAllUpcomingEvents(hoursAhead);
+    await scheduleExistingEvents();
+    const result = await scheduleSeriesReminders();
 
     res.json({
       success: true,
-      message: 'Reminders checked',
-      data: result
+      message: 'Reminders checked via queue',
+      data: { scheduledCount: result?.scheduledCount || 0 }
     });
   } catch (error) {
     console.error('Check reminders error:', error);

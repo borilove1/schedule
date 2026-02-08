@@ -11,133 +11,186 @@ export default function EventEditForm({
   const { isDarkMode, inputBg, borderColor, textColor, cardBg, bgColor, secondaryTextColor } = useThemeColors();
   const { inputStyle, labelStyle, fontFamily } = useCommonStyles();
   const [showOfficeDropdown, setShowOfficeDropdown] = useState(false);
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [officeFocusedIdx, setOfficeFocusedIdx] = useState(-1);
+  const [priorityFocusedIdx, setPriorityFocusedIdx] = useState(-1);
   const officeDropdownRef = useRef(null);
+  const priorityDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (officeDropdownRef.current && !officeDropdownRef.current.contains(e.target)) {
         setShowOfficeDropdown(false);
       }
+      if (priorityDropdownRef.current && !priorityDropdownRef.current.contains(e.target)) {
+        setShowPriorityDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const fieldHeight = '46px';
+
+  const dateInputStyle = {
+    ...inputStyle,
+    height: fieldHeight,
+    colorScheme: isDarkMode ? 'dark' : 'light',
+  };
+
+  const uniformInputStyle = {
+    ...inputStyle,
+    height: fieldHeight,
+  };
+
+  const priorityOptions = [
+    { value: 'LOW', label: '낮음' },
+    { value: 'NORMAL', label: '보통' },
+    { value: 'HIGH', label: '높음' },
+  ];
+
   return (
     <form onSubmit={onSubmit}>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '14px' }}>
         <label style={labelStyle}>제목 *</label>
-        <input type="text" name="title" value={formData.title} onChange={onChange} required style={{ ...inputStyle, boxSizing: 'border-box' }} />
+        <input type="text" name="title" value={formData.title} onChange={onChange} required style={uniformInputStyle} placeholder="일정 제목을 입력하세요" />
       </div>
-      <div style={{ marginBottom: '20px' }}>
+
+      <div style={{ marginBottom: '14px' }}>
         <label style={labelStyle}>내용</label>
-        <textarea name="content" value={formData.content} onChange={onChange} rows={4} style={{ ...inputStyle, resize: 'vertical', boxSizing: 'border-box' }} />
+        <textarea name="content" value={formData.content} onChange={onChange} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="일정 내용을 입력하세요" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
         <div>
           <label style={labelStyle}>시작 날짜 *</label>
-          <input type="date" name="startDate" value={formData.startDate} onChange={onChange} required style={{ ...inputStyle, boxSizing: 'border-box' }} />
+          <input type="date" name="startDate" value={formData.startDate} onChange={onChange} required style={dateInputStyle} />
         </div>
         <div>
           <label style={labelStyle}>시작 시간 *</label>
-          <input type="time" name="startTime" value={formData.startTime} onChange={onChange} required style={{ ...inputStyle, boxSizing: 'border-box' }} />
+          <input type="time" name="startTime" value={formData.startTime} onChange={onChange} required style={dateInputStyle} />
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
         <div>
           <label style={labelStyle}>종료 날짜 *</label>
-          <input type="date" name="endDate" value={formData.endDate} onChange={onChange} required style={{ ...inputStyle, boxSizing: 'border-box' }} />
+          <input type="date" name="endDate" value={formData.endDate} onChange={onChange} required style={dateInputStyle} />
         </div>
         <div>
           <label style={labelStyle}>종료 시간 *</label>
-          <input type="time" name="endTime" value={formData.endTime} onChange={onChange} required style={{ ...inputStyle, boxSizing: 'border-box' }} />
+          <input type="time" name="endTime" value={formData.endTime} onChange={onChange} required style={dateInputStyle} />
         </div>
       </div>
 
-      {(() => {
-        // 반복 일정 "이번만 수정"이면 반복 설정 변경 불가
-        const isRecurringThisOnly = editType === 'this' && (event?.isRecurring || event?.seriesId);
-        const canToggleRecurring = !isRecurringThisOnly && onRecurringToggle;
-
-        return (
-          <div style={{
-            padding: '16px 20px', borderRadius: '12px', backgroundColor: inputBg,
-            marginBottom: '24px', border: `1px solid ${borderColor}`
-          }}>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              cursor: canToggleRecurring ? 'pointer' : 'default',
-              fontFamily, fontSize: '14px', fontWeight: '500', color: textColor
-            }}>
-              <input
-                type="checkbox"
-                checked={!!formData.isRecurring}
-                onChange={canToggleRecurring ? onRecurringToggle : undefined}
-                disabled={!canToggleRecurring}
-                style={{ width: '18px', height: '18px', cursor: canToggleRecurring ? 'pointer' : 'default', accentColor: '#3B82F6' }}
-              />
-              <Repeat size={16} />
-              반복 일정
-              {isRecurringThisOnly && (
-                <span style={{ fontSize: '12px', color: secondaryTextColor, fontWeight: '400' }}>
-                  (전체 수정에서 변경 가능)
-                </span>
-              )}
-            </label>
-
-            {formData.isRecurring && !isRecurringThisOnly && (
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={labelStyle}>반복 주기</label>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <input
-                      type="number" name="recurrenceInterval" value={formData.recurrenceInterval}
-                      onChange={onChange} min="1" max="99"
-                      style={{ ...inputStyle, width: '80px', textAlign: 'center', boxSizing: 'border-box' }}
-                    />
-                    <select
-                      name="recurrenceType" value={formData.recurrenceType} onChange={onChange}
-                      style={{ ...inputStyle, width: 'auto', flex: 1, boxSizing: 'border-box', cursor: 'pointer' }}
-                    >
-                      <option value="day">일마다</option>
-                      <option value="week">주마다</option>
-                      <option value="month">개월마다</option>
-                      <option value="year">년마다</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>반복 종료일</label>
-                  <input
-                    type="date" name="recurrenceEndDate" value={formData.recurrenceEndDate}
-                    onChange={onChange} style={{ ...inputStyle, boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-            )}
+      {/* 우선순위 */}
+      <div style={{ marginBottom: '14px' }}>
+        <label style={labelStyle}>우선순위</label>
+        <div ref={priorityDropdownRef} style={{ position: 'relative' }}>
+          <div
+            tabIndex={0}
+            onClick={() => { setShowPriorityDropdown(!showPriorityDropdown); const idx = priorityOptions.findIndex(o => o.value === formData.priority); setPriorityFocusedIdx(idx >= 0 ? idx : 0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (showPriorityDropdown && priorityFocusedIdx >= 0) {
+                  onChange({ target: { name: 'priority', value: priorityOptions[priorityFocusedIdx].value } });
+                  setShowPriorityDropdown(false);
+                } else {
+                  setShowPriorityDropdown(!showPriorityDropdown);
+                  const idx = priorityOptions.findIndex(o => o.value === formData.priority);
+                  setPriorityFocusedIdx(idx >= 0 ? idx : 0);
+                }
+              } else if (e.key === 'Escape') { setShowPriorityDropdown(false); }
+              else if (e.key === 'ArrowDown') { e.preventDefault(); if (!showPriorityDropdown) { setShowPriorityDropdown(true); const idx = priorityOptions.findIndex(o => o.value === formData.priority); setPriorityFocusedIdx(idx >= 0 ? idx : 0); } else { setPriorityFocusedIdx(prev => Math.min(prev + 1, priorityOptions.length - 1)); } }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); if (!showPriorityDropdown) { setShowPriorityDropdown(true); const idx = priorityOptions.findIndex(o => o.value === formData.priority); setPriorityFocusedIdx(idx >= 0 ? idx : 0); } else { setPriorityFocusedIdx(prev => Math.max(prev - 1, 0)); } }
+              else if (e.key === 'Tab') { if (showPriorityDropdown) setShowPriorityDropdown(false); }
+            }}
+            style={{
+              ...uniformInputStyle,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingRight: '36px',
+              position: 'relative',
+              borderColor: showPriorityDropdown ? '#3B82F6' : borderColor,
+              boxShadow: showPriorityDropdown ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
+              outline: 'none',
+            }}
+          >
+            <span>{{ LOW: '낮음', NORMAL: '보통', HIGH: '높음' }[formData.priority] || '보통'}</span>
+            <ChevronDown size={16} style={{
+              position: 'absolute', right: '12px', top: '50%',
+              color: secondaryTextColor,
+              transform: showPriorityDropdown ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+              transition: 'transform 0.2s',
+            }} />
           </div>
-        );
-      })()}
+          {showPriorityDropdown && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+              marginTop: '4px', borderRadius: '8px', border: `1px solid ${borderColor}`,
+              backgroundColor: cardBg, boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
+              overflow: 'hidden',
+            }}>
+              {priorityOptions.map((opt, idx) => (
+                <div key={opt.value}
+                  onClick={() => { onChange({ target: { name: 'priority', value: opt.value } }); setShowPriorityDropdown(false); }}
+                  style={{
+                    padding: '10px 12px', cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor,
+                    backgroundColor: idx === priorityFocusedIdx
+                      ? (isDarkMode ? '#1e293b' : '#f0f9ff')
+                      : formData.priority === opt.value ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent',
+                  }}
+                  onMouseEnter={() => setPriorityFocusedIdx(idx)}
+                  onMouseLeave={(e) => { if (idx !== priorityFocusedIdx && formData.priority !== opt.value) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {opt.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
+      {/* 일정 공유 */}
       {offices.length > 0 && onOfficeToggle && (
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '14px' }}>
           <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Share2 size={14} /> 일정 공유 (선택사항)
           </label>
           <div ref={officeDropdownRef} style={{ position: 'relative' }}>
             <div
-              onClick={() => setShowOfficeDropdown(!showOfficeDropdown)}
+              tabIndex={0}
+              onClick={() => { setShowOfficeDropdown(!showOfficeDropdown); setOfficeFocusedIdx(0); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (showOfficeDropdown && officeFocusedIdx >= 0 && officeFocusedIdx < offices.length) {
+                    onOfficeToggle(offices[officeFocusedIdx].id);
+                  } else {
+                    setShowOfficeDropdown(!showOfficeDropdown); setOfficeFocusedIdx(0);
+                  }
+                } else if (e.key === 'Escape') { setShowOfficeDropdown(false); }
+                else if (e.key === 'ArrowDown') { e.preventDefault(); if (!showOfficeDropdown) { setShowOfficeDropdown(true); setOfficeFocusedIdx(0); } else { setOfficeFocusedIdx(prev => Math.min(prev + 1, offices.length - 1)); } }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); if (!showOfficeDropdown) { setShowOfficeDropdown(true); setOfficeFocusedIdx(0); } else { setOfficeFocusedIdx(prev => Math.max(prev - 1, 0)); } }
+                else if (e.key === 'Tab') { if (showOfficeDropdown) setShowOfficeDropdown(false); }
+              }}
               style={{
-                ...inputStyle,
-                boxSizing: 'border-box',
+                ...uniformInputStyle,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                minHeight: '44px',
+                minHeight: fieldHeight,
+                height: 'auto',
                 paddingRight: '36px',
                 position: 'relative',
                 flexWrap: 'wrap',
-                gap: '4px'
+                gap: '4px',
+                borderColor: showOfficeDropdown ? '#3B82F6' : borderColor,
+                boxShadow: showOfficeDropdown ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
+                outline: 'none',
               }}
             >
               {selectedOfficeIds.length > 0 ? (
@@ -174,15 +227,18 @@ export default function EventEditForm({
                 position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
                 marginTop: '4px', borderRadius: '8px', border: `1px solid ${borderColor}`,
                 backgroundColor: cardBg, boxShadow: isDarkMode ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.12)',
-                maxHeight: '200px', overflowY: 'auto'
+                maxHeight: '120px', overflowY: 'auto'
               }}>
-                {offices.map(office => (
+                {offices.map((office, idx) => (
                   <label key={office.id} style={{
                     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                     cursor: 'pointer', fontFamily, fontSize: '14px', color: textColor,
-                    backgroundColor: selectedOfficeIds.includes(office.id)
-                      ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent'
-                  }}>
+                    backgroundColor: idx === officeFocusedIdx
+                      ? (isDarkMode ? '#1e293b' : '#f0f9ff')
+                      : selectedOfficeIds.includes(office.id) ? (isDarkMode ? '#1e293b' : '#f0f9ff') : 'transparent'
+                  }}
+                    onMouseEnter={() => setOfficeFocusedIdx(idx)}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedOfficeIds.includes(office.id)}
@@ -202,6 +258,80 @@ export default function EventEditForm({
           </p>
         </div>
       )}
+
+      {/* 반복 일정 설정 */}
+      {(() => {
+        const isRecurringThisOnly = editType === 'this' && (event?.isRecurring || event?.seriesId);
+        const canToggleRecurring = !isRecurringThisOnly && onRecurringToggle;
+
+        return (
+          <>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                cursor: canToggleRecurring ? 'pointer' : 'default', fontFamily
+              }}>
+                <input
+                  type="checkbox"
+                  checked={!!formData.isRecurring}
+                  onChange={canToggleRecurring ? onRecurringToggle : undefined}
+                  disabled={!canToggleRecurring}
+                  style={{ width: '18px', height: '18px', cursor: canToggleRecurring ? 'pointer' : 'default', accentColor: '#3B82F6' }}
+                />
+                <span style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>
+                  반복 일정으로 등록
+                  {isRecurringThisOnly && (
+                    <span style={{ fontSize: '12px', color: secondaryTextColor, fontWeight: '400', marginLeft: '8px' }}>
+                      (전체 수정에서 변경 가능)
+                    </span>
+                  )}
+                </span>
+              </label>
+            </div>
+
+            {formData.isRecurring && !isRecurringThisOnly && (
+              <div style={{
+                padding: '14px', borderRadius: '10px', backgroundColor: bgColor,
+                marginBottom: '16px', border: `1px solid ${borderColor}`
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>반복 주기</label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="number" name="recurrenceInterval" value={formData.recurrenceInterval}
+                      onChange={onChange} min="1" max="99"
+                      style={{ ...inputStyle, width: '80px', textAlign: 'center' }}
+                    />
+                    <select
+                      name="recurrenceType" value={formData.recurrenceType} onChange={onChange}
+                      style={{ ...inputStyle, width: 'auto', flex: 1, cursor: 'pointer' }}
+                    >
+                      <option value="day">일마다</option>
+                      <option value="week">주마다</option>
+                      <option value="month">개월마다</option>
+                      <option value="year">년마다</option>
+                    </select>
+                  </div>
+                  <p style={{ marginTop: '8px', fontSize: '13px', color: secondaryTextColor, fontFamily }}>
+                    {formData.recurrenceInterval === '1' || formData.recurrenceInterval === 1
+                      ? `매${formData.recurrenceType === 'day' ? '일' : formData.recurrenceType === 'week' ? '주' : formData.recurrenceType === 'month' ? '월' : '년'} 반복`
+                      : `${formData.recurrenceInterval}${formData.recurrenceType === 'day' ? '일' : formData.recurrenceType === 'week' ? '주' : formData.recurrenceType === 'month' ? '개월' : '년'}마다 반복`}
+                  </p>
+                </div>
+                <div>
+                  <label style={labelStyle}>반복 종료일 *</label>
+                  <input
+                    type="date" name="recurrenceEndDate" value={formData.recurrenceEndDate}
+                    onChange={onChange} required={formData.isRecurring} min={formData.startDate}
+                    style={dateInputStyle}
+                  />
+                  <p style={{ marginTop: '8px', fontSize: '13px', color: secondaryTextColor, fontFamily }}>이 날짜까지 반복됩니다</p>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {rateLimitCountdown > 0 ? (
         <div style={{
@@ -225,11 +355,11 @@ export default function EventEditForm({
         <ErrorAlert message={error} />
       )}
 
-      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
         <button
           type="button" onClick={onCancel}
           style={{
-            padding: '12px 24px', borderRadius: '8px', border: `1px solid ${borderColor}`,
+            padding: '10px 20px', borderRadius: '8px', border: `1px solid ${borderColor}`,
             backgroundColor: 'transparent', color: textColor, cursor: 'pointer',
             fontSize: '14px', fontWeight: '500', fontFamily
           }}
@@ -239,10 +369,11 @@ export default function EventEditForm({
         <button
           type="submit" disabled={loading || actionInProgress || rateLimitCountdown > 0}
           style={{
-            padding: '12px 24px', borderRadius: '8px', border: 'none',
+            padding: '10px 20px', borderRadius: '8px', border: 'none',
             backgroundColor: (loading || actionInProgress || rateLimitCountdown > 0) ? '#1e40af' : '#3B82F6',
             color: '#fff', cursor: (loading || actionInProgress || rateLimitCountdown > 0) ? 'not-allowed' : 'pointer',
-            fontSize: '14px', fontWeight: '500', fontFamily
+            fontSize: '14px', fontWeight: '500', fontFamily,
+            opacity: (loading || actionInProgress || rateLimitCountdown > 0) ? 0.5 : 1
           }}
         >
           {(loading || actionInProgress) ? '저장 중...' : '저장'}

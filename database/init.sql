@@ -310,6 +310,7 @@ INSERT INTO system_settings (key, value, description) VALUES
     ('default_alert', '"1hour"', '기본 알림 시간'),
     ('password_min_length', '4', '비밀번호 최소 길이'),
     ('session_timeout', '60', '세션 타임아웃 (분)'),
+    ('reminder_times', '["1hour"]', '일정 시작 전 알림 시간 (복수 선택 가능: 30min, 1hour, 3hour)'),
     ('email_enabled', 'false', '이메일 알림 활성화 여부'),
     ('smtp_auth_type', '"LOGIN"', 'SMTP 인증 방식 (LOGIN, NONE, API_KEY)'),
     ('smtp_host', '""', 'SMTP 서버 호스트'),

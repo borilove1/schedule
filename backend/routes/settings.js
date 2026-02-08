@@ -2,6 +2,7 @@ const express = require('express');
 const { query } = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth');
 const { testConnection, sendEmail, invalidateTransporterCache } = require('../src/utils/emailService');
+const { rescheduleAllReminders } = require('../src/utils/reminderQueueService');
 
 const router = express.Router();
 
@@ -50,6 +51,16 @@ router.put('/', async (req, res, next) => {
     const hasSmtpChanges = Object.keys(updates).some(k => k.startsWith('smtp_') || k === 'email_enabled');
     if (hasSmtpChanges) {
       invalidateTransporterCache();
+    }
+
+    // reminder_times 변경 시 모든 리마인더 재스케줄링
+    if (Object.keys(updates).includes('reminder_times')) {
+      try {
+        await rescheduleAllReminders();
+        console.log('[Settings] Reminder times changed, rescheduled all reminders');
+      } catch (err) {
+        console.error('[Settings] Failed to reschedule reminders:', err.message);
+      }
     }
 
     res.json({
