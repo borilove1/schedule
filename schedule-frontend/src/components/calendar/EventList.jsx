@@ -18,7 +18,7 @@ const EventList = React.memo(function EventList({
   }, [selectedTab, selectedDay]);
 
   return (
-    <div id="event-list">
+    <div id="event-list" style={{ overflowAnchor: 'none' }}>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',

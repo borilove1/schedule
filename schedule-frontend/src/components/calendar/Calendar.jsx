@@ -127,7 +127,11 @@ export default function Calendar() {
   }, []);
 
   const handleDayClick = useCallback((day) => {
+    const scrollY = window.scrollY;
     setSelectedDay(day);
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
   }, []);
 
   const handlePrevMonth = useCallback(() => {
