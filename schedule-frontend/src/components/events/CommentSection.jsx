@@ -8,7 +8,7 @@ import ConfirmDialog from '../common/ConfirmDialog';
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", "Segoe UI", sans-serif';
 
-export default function CommentSection({ eventId, currentUser, canEdit }) {
+export default function CommentSection({ eventId, currentUser, canEdit, rateLimitCountdown = 0 }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -476,12 +476,12 @@ export default function CommentSection({ eventId, currentUser, canEdit }) {
                   autoResize(e.target);
                 }}
                 placeholder="댓글을 입력하세요..."
-                disabled={inProgress}
+                disabled={inProgress || rateLimitCountdown > 0}
                 rows={1}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    if (newComment.trim()) handleAddComment(e);
+                    if (newComment.trim() && rateLimitCountdown <= 0) handleAddComment(e);
                   }
                 }}
                 style={{
@@ -497,7 +497,7 @@ export default function CommentSection({ eventId, currentUser, canEdit }) {
                   minHeight: '42px',
                   outline: 'none',
                   boxSizing: 'border-box',
-                  opacity: inProgress ? 0.5 : 1,
+                  opacity: (inProgress || rateLimitCountdown > 0) ? 0.5 : 1,
                   transition: 'border-color 0.2s, box-shadow 0.2s',
                   lineHeight: '1.5',
                   overflow: 'hidden',
@@ -514,14 +514,14 @@ export default function CommentSection({ eventId, currentUser, canEdit }) {
             </div>
             <button
               type="submit"
-              disabled={!newComment.trim() || inProgress}
+              disabled={!newComment.trim() || inProgress || rateLimitCountdown > 0}
               style={{
                 padding: '10px 12px',
                 borderRadius: '10px',
                 border: 'none',
-                backgroundColor: (!newComment.trim() || inProgress) ? (isDarkMode ? '#334155' : '#e2e8f0') : '#3B82F6',
-                color: (!newComment.trim() || inProgress) ? secondaryTextColor : '#fff',
-                cursor: (!newComment.trim() || inProgress) ? 'not-allowed' : 'pointer',
+                backgroundColor: (!newComment.trim() || inProgress || rateLimitCountdown > 0) ? (isDarkMode ? '#334155' : '#e2e8f0') : '#3B82F6',
+                color: (!newComment.trim() || inProgress || rateLimitCountdown > 0) ? secondaryTextColor : '#fff',
+                cursor: (!newComment.trim() || inProgress || rateLimitCountdown > 0) ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 display: 'flex',
                 alignItems: 'center',
@@ -529,7 +529,7 @@ export default function CommentSection({ eventId, currentUser, canEdit }) {
                 flexShrink: 0,
                 width: '42px',
                 height: '42px',
-                opacity: (!newComment.trim() || inProgress) ? 0.5 : 1,
+                opacity: (!newComment.trim() || inProgress || rateLimitCountdown > 0) ? 0.5 : 1,
                 transition: 'all 0.15s',
               }}
             >

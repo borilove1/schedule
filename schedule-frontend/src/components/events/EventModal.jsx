@@ -162,7 +162,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
     } catch (err) {
       const msg = err.message || '일정 생성에 실패했습니다.';
       setError(msg);
-      if ((msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT')) && onRateLimitStart) onRateLimitStart(30);
+      if ((msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT')) && onRateLimitStart) onRateLimitStart(60);
     } finally {
       setLoading(false);
     }
@@ -377,7 +377,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
                   </div>
                 )}
               </div>
-              <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily }}>
+              <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily, paddingLeft: '14px' }}>
                 {selectedOfficeIds.length > 0
                   ? `${selectedOfficeIds.length}개 처/실 소속 전원이 이 일정을 볼 수 있습니다.`
                   : '같은 부서원은 항상 볼 수 있습니다.'}

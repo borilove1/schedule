@@ -85,8 +85,8 @@ export default function Calendar() {
       console.error('Failed to load events:', err);
       const msg = err.message || '';
       if (msg.includes('너무 많은 요청') || msg.includes('RATE_LIMIT')) {
-        startCountdown(30);
-        setTimeout(() => loadEvents(), 30000);
+        startCountdown(60);
+        setTimeout(() => loadEvents(), 60000);
       }
     } finally {
       setEventsLoading(false);

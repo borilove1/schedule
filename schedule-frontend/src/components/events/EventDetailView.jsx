@@ -213,6 +213,7 @@ export default function EventDetailView({
         eventId={eventId}
         currentUser={currentUser}
         canEdit={true}
+        rateLimitCountdown={rateLimitCountdown}
       />
     </>
   );

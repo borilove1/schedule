@@ -84,7 +84,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
     } catch (err) {
       const msg = err.message || '';
       setError(`오류: ${msg}`);
-      if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
+      if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(60);
     } finally {
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
       } catch (err) {
         const msg = err.message || '일정 수정에 실패했습니다.';
         setError(msg);
-        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
+        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(60);
       } finally {
         setLoading(false);
       }
@@ -160,7 +160,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
       } catch (err) {
         const msg = err.message || '일정 삭제에 실패했습니다.';
         setError(msg);
-        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
+        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(60);
       } finally {
         setLoading(false);
       }
@@ -201,7 +201,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess, 
       } catch (err) {
         const msg = err.message || '상태 변경에 실패했습니다.';
         setError(msg);
-        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(30);
+        if (isRateLimitError(msg) && onRateLimitStart) onRateLimitStart(60);
       } finally {
         setLoading(false);
       }

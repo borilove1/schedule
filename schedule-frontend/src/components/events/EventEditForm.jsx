@@ -195,7 +195,7 @@ export default function EventEditForm({
               </div>
             )}
           </div>
-          <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily }}>
+          <p style={{ marginTop: '6px', fontSize: '12px', color: secondaryTextColor, fontFamily, paddingLeft: '14px' }}>
             {selectedOfficeIds.length > 0
               ? `${selectedOfficeIds.length}개 처/실 소속 전원이 이 일정을 볼 수 있습니다.`
               : '같은 부서원은 항상 볼 수 있습니다.'}
