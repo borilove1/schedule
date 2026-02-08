@@ -3,11 +3,12 @@ import { Edit2, Trash2, Check, Calendar, Clock, Repeat, Eye, Users } from 'lucid
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { getStatusColor, getStatusText, getRecurrenceDescription } from '../../utils/eventHelpers';
 import ErrorAlert from '../common/ErrorAlert';
+import CommentSection from './CommentSection';
 
 const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Pretendard", "Inter", sans-serif';
 
 export default function EventDetailView({
-  event, currentUser, onEdit, onDelete, onComplete, loading, actionInProgress, error
+  event, currentUser, onEdit, onDelete, onComplete, loading, actionInProgress, error, eventId
 }) {
   const { isDarkMode, textColor, secondaryTextColor, inputBg } = useThemeColors();
 
@@ -195,6 +196,13 @@ export default function EventDetailView({
           다른 사용자의 일정은 조회만 가능합니다.
         </div>
       )}
+
+      {/* 댓글 섹션 */}
+      <CommentSection
+        eventId={eventId}
+        currentUser={currentUser}
+        canEdit={true}
+      />
     </>
   );
 }

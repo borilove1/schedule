@@ -1,10 +1,55 @@
 const express = require('express');
 const { query } = require('../config/database');
 const { authenticate, canViewEvent, canEditEvent } = require('../middleware/auth');
+const { createNotification } = require('../src/controllers/notificationController');
 
 const router = express.Router();
 
 router.use(authenticate);
+
+// ========== 댓글 조회 (일정) ==========
+router.get('/events/:eventId', async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+
+    const result = await query(`
+      SELECT id, content, event_id, series_id,
+             author_name, author_id, is_edited, created_at, updated_at
+      FROM v_comments_with_details
+      WHERE event_id = $1
+      ORDER BY created_at ASC
+    `, [eventId]);
+
+    res.json({
+      success: true,
+      data: { comments: result.rows }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== 댓글 조회 (반복 일정 시리즈) ==========
+router.get('/series/:seriesId', async (req, res, next) => {
+  try {
+    const { seriesId } = req.params;
+
+    const result = await query(`
+      SELECT id, content, event_id, series_id,
+             author_name, author_id, is_edited, created_at, updated_at
+      FROM v_comments_with_details
+      WHERE series_id = $1
+      ORDER BY created_at ASC
+    `, [seriesId]);
+
+    res.json({
+      success: true,
+      data: { comments: result.rows }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ========== 댓글 추가 (일정) ==========
 router.post('/events/:eventId', async (req, res, next) => {
@@ -35,6 +80,23 @@ router.post('/events/:eventId', async (req, res, next) => {
       VALUES ($1, $2, $3)
       RETURNING id, content, is_edited, created_at
     `, [content, eventId, req.user.id]);
+
+    // 일정 작성자에게 알림 (자기 댓글 제외)
+    const event = eventResult.rows[0];
+    if (event.creator_id !== req.user.id) {
+      try {
+        await createNotification(
+          event.creator_id,
+          'EVENT_COMMENTED',
+          '새 댓글',
+          `"${event.title}" 일정에 ${req.user.name}님이 댓글을 남겼습니다.`,
+          parseInt(eventId),
+          { commentAuthor: req.user.name, commentContent: content.substring(0, 100) }
+        );
+      } catch (notifError) {
+        console.error('Comment notification error:', notifError);
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -80,6 +142,23 @@ router.post('/series/:seriesId', async (req, res, next) => {
       VALUES ($1, $2, $3)
       RETURNING id, content, is_edited, created_at
     `, [content, seriesId, req.user.id]);
+
+    // 시리즈 작성자에게 알림 (자기 댓글 제외)
+    const series = seriesResult.rows[0];
+    if (series.creator_id !== req.user.id) {
+      try {
+        await createNotification(
+          series.creator_id,
+          'EVENT_COMMENTED',
+          '새 댓글',
+          `"${series.title}" 일정에 ${req.user.name}님이 댓글을 남겼습니다.`,
+          null,
+          { seriesId: parseInt(seriesId), commentAuthor: req.user.name, commentContent: content.substring(0, 100) }
+        );
+      } catch (notifError) {
+        console.error('Comment notification error:', notifError);
+      }
+    }
 
     res.status(201).json({
       success: true,

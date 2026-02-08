@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, MessageCircle } from 'lucide-react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { getStatusColor, getStatusText, norm } from '../../utils/eventHelpers';
@@ -159,6 +159,24 @@ const EventList = React.memo(function EventList({
                         flexShrink: 0
                       }}>
                         공유
+                      </span>
+                    )}
+                    {event.commentCount > 0 && (
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        backgroundColor: isDarkMode ? '#1e3a5f' : '#dbeafe',
+                        color: isDarkMode ? '#93c5fd' : '#2563eb',
+                        fontWeight: '600',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}>
+                        <MessageCircle size={11} />
+                        {event.commentCount}
                       </span>
                     )}
                   </div>

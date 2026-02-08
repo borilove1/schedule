@@ -202,11 +202,30 @@ exports.getEvents = async (req, res) => {
       }
     }
 
+    // 8-1. 댓글 수 일괄 조회
+    let commentCountMap = {};
+    if (eventIds.length > 0 || allSeriesIds.length > 0) {
+      const commentCountQuery = `
+        SELECT event_id, series_id, COUNT(*) as comment_count
+        FROM comments
+        WHERE event_id = ANY($1) OR series_id = ANY($2)
+        GROUP BY event_id, series_id
+      `;
+      const commentCountResult = await query(commentCountQuery, [eventIds, allSeriesIds]);
+      for (const row of commentCountResult.rows) {
+        const key = row.event_id ? `event_${row.event_id}` : `series_${row.series_id}`;
+        commentCountMap[key] = parseInt(row.comment_count);
+      }
+    }
+
     // 9. 필드명 camelCase로 변환 (프론트엔드 호환)
     const formattedEvents = allEvents.map(event => {
       const sharedOffices = sharedMap[`event_${event.id}`]
         || sharedMap[`series_${event.series_id}`]
         || [];
+      const commentCount = commentCountMap[`event_${event.id}`]
+        || commentCountMap[`series_${event.series_id}`]
+        || 0;
       return {
         id: event.id,
         title: event.title,
@@ -233,6 +252,7 @@ exports.getEvents = async (req, res) => {
         office: event.office_name,
         division: event.division_name,
         sharedOffices,
+        commentCount,
         createdAt: toNaiveDateTimeString(event.created_at),
         updatedAt: toNaiveDateTimeString(event.updated_at)
       };

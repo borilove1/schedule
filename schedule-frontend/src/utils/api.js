@@ -253,10 +253,38 @@ class ApiClient {
   }
 
   // 댓글
-  async addComment(eventId, content) {
+  async getEventComments(eventId) {
+    return this.request(`/comments/events/${eventId}`);
+  }
+
+  async getSeriesComments(seriesId) {
+    return this.request(`/comments/series/${seriesId}`);
+  }
+
+  async addEventComment(eventId, content) {
     return this.request(`/comments/events/${eventId}`, {
       method: 'POST',
       body: JSON.stringify({ content }),
+    });
+  }
+
+  async addSeriesComment(seriesId, content) {
+    return this.request(`/comments/series/${seriesId}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async updateComment(commentId, content) {
+    return this.request(`/comments/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async deleteComment(commentId) {
+    return this.request(`/comments/${commentId}`, {
+      method: 'DELETE',
     });
   }
 

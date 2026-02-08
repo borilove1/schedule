@@ -276,6 +276,7 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onSuccess }
                 loading={loading}
                 actionInProgress={actionGuard.inProgress}
                 error={error}
+                eventId={eventId}
               />
             ) : (
               <EventEditForm

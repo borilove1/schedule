@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-업무 일정 관리 시스템. 반복 일정, 알림, 일정 공유, 사용자 승인, 관리자 페이지, 프로필 관리, 다크모드를 지원하는 풀스택 웹 애플리케이션이며 Docker로 배포됩니다.
+업무 일정 관리 시스템. 반복 일정, 알림, 일정 공유, 댓글, 사용자 승인, 관리자 페이지, 프로필 관리, 다크모드를 지원하는 풀스택 웹 애플리케이션이며 Docker로 배포됩니다.
 
 **기술 스택:**
 - **백엔드**: Node.js 18+ / Express 4 / PostgreSQL 13+
@@ -39,7 +39,7 @@ schedule/
 │   │   ├── events.js                   # 일정 CRUD + 완료/완료취소
 │   │   ├── users.js                    # 사용자 관리 + 승인 (ADMIN 전용)
 │   │   ├── organizations.js            # 조직 구조 CRUD (본부/처/부서)
-│   │   ├── comments.js                 # 댓글 CRUD (일정/시리즈)
+│   │   ├── comments.js                 # 댓글 조회/CRUD + 댓글 알림 (일정/시리즈)
 │   │   ├── notifications.js            # 알림 조회/읽음/삭제/리마인더체크
 │   │   └── settings.js                 # 시스템 설정 (ADMIN 전용)
 │   └── src/
@@ -86,11 +86,12 @@ schedule/
 │       │   │   ├── CalendarHeader.jsx  # 월/년 표시, 이전/다음 월, TODAY, + 버튼
 │       │   │   ├── CalendarGrid.jsx    # 캘린더 그리드 (유연 레인: 멀티→단일 배치)
 │       │   │   ├── calendarHelpers.js  # 날짜/주/멀티데이/단일/레인 할당 유틸
-│       │   │   └── EventList.jsx       # 일정 목록 (탭 필터/날짜 필터/더보기)
+│       │   │   └── EventList.jsx       # 일정 목록 (탭 필터/날짜 필터/더보기/댓글 카운트 뱃지)
 │       │   ├── events/
 │       │   │   ├── EventModal.jsx      # 일정 생성 모달 (반복 설정 + 처/실 공유)
 │       │   │   ├── EventDetailModal.jsx # 일정 상세/수정/삭제/완료 모달
-│       │   │   ├── EventDetailView.jsx # 일정 상세 표시 (상태/제목/시간/작성자/반복/공유)
+│       │   │   ├── EventDetailView.jsx # 일정 상세 표시 (상태/제목/시간/작성자/반복/공유/댓글)
+│       │   │   ├── CommentSection.jsx  # 댓글 인라인 섹션 (조회/작성/수정/삭제)
 │       │   │   └── EventEditForm.jsx   # 일정 수정 폼 (반복/공유 설정 포함)
 │       │   ├── notifications/
 │       │   │   ├── NotificationBell.jsx # 헤더 알림 벨 아이콘 + 뱃지 (99+)
@@ -240,8 +241,18 @@ schedule/
 - **이벤트 알림**: 일정 생성/수정/완료/삭제 시 `createNotification()` 호출
 - **가입 알림**: 회원가입 시 ADMIN에게 USER_REGISTERED, 승인 시 사용자에게 ACCOUNT_APPROVED
 - **프론트엔드**: `NotificationContext`에서 60초마다 읽지 않은 알림 개수 폴링
-- **알림 타입**: EVENT_REMINDER, EVENT_COMPLETED, EVENT_UPDATED, EVENT_DELETED, USER_REGISTERED, ACCOUNT_APPROVED, SYSTEM
+- **댓글 알림**: 댓글 작성 시 일정 작성자에게 EVENT_COMMENTED 알림 (자기 댓글 제외)
+- **알림 타입**: EVENT_REMINDER, EVENT_COMPLETED, EVENT_UPDATED, EVENT_DELETED, EVENT_COMMENTED, USER_REGISTERED, ACCOUNT_APPROVED, SYSTEM
 - **중복 방지**: 48시간 윈도우 내 동일 이벤트 리마인더 중복 생성 방지
+
+### 댓글 시스템
+- **인라인 UI**: EventDetailView 하단에 CommentSection 컴포넌트 (구분선 아래)
+- **데이터 흐름**: eventId가 `series-*` 형식이면 seriesId 추출 → 시리즈 댓글 API 호출
+- **CRUD**: 조회(GET)/작성(POST)/수정(PUT, 본인만)/삭제(DELETE, 본인 또는 ADMIN)
+- **알림**: 타인 일정에 댓글 시 작성자에게 EVENT_COMMENTED 알림 (자기 댓글 제외)
+- **EventList 뱃지**: `getEvents()` 응답에 `commentCount` 포함 → 카드에 💬 N 뱃지 표시
+- **UX**: Enter 전송/Shift+Enter 줄바꿈, 이니셜 아바타(작성자별 색상), 상대 시간, (수정됨) 뱃지
+- **권한**: canEdit=true면 댓글 작성 가능, 수정은 본인만, 삭제는 본인 또는 ADMIN
 
 ### 캘린더 그리드 레인 시스템
 - 멀티데이 이벤트를 `assignLanes()`로 비충돌 레인 배치 (최대 PC:5, 모바일:3)
@@ -319,8 +330,10 @@ schedule/
 ### 댓글 (`/comments`)
 | Method | Path | 인증 | 설명 |
 |--------|------|------|------|
-| POST | /events/:eventId | O | 일정에 댓글 추가 (canViewEvent 확인) |
-| POST | /series/:seriesId | O | 시리즈에 댓글 추가 |
+| GET | /events/:eventId | O | 일정 댓글 목록 (v_comments_with_details, ASC) |
+| GET | /series/:seriesId | O | 시리즈 댓글 목록 |
+| POST | /events/:eventId | O | 일정에 댓글 추가 (canViewEvent 확인) + 작성자에게 EVENT_COMMENTED 알림 |
+| POST | /series/:seriesId | O | 시리즈에 댓글 추가 + 작성자에게 EVENT_COMMENTED 알림 |
 | PUT | /:id | O | 댓글 수정 (본인만, is_edited=true) |
 | DELETE | /:id | O | 댓글 삭제 (본인 또는 ADMIN) |
 
@@ -368,7 +381,7 @@ schedule/
 - `API_BASE_URL`은 `REACT_APP_API_URL` 환경변수 또는 `/api/v1` (nginx 프록시 사용 시)
 - **중요**: `getEvent()`는 `response?.event || response` 반환
 - `request()` 메서드가 `{ success: true, data: {...} }` 형태면 `data`만 자동 추출
-- 메서드 그룹: Auth, Events, Users, Organizations, Settings, Comments, Notifications
+- 메서드 그룹: Auth, Events, Users, Organizations, Settings, Comments (getEventComments/getSeriesComments/addEventComment/addSeriesComment/updateComment/deleteComment), Notifications
 
 ### 프론트엔드 상태 관리
 - React Context API만 사용 (외부 상태 관리 라이브러리 없음)
@@ -561,10 +574,10 @@ UPDATE users SET is_active = true, approved_at = NOW() WHERE id = <userId>;
 6. 중복 클릭으로 다중 요청 → useActionGuard 훅 도입
 7. Rate Limit 비활성화 → 재활성화 (로그인/인증/일정 3단계) + 프론트엔드 입력 검증 추가
 8. 캘린더 레인 고정 배치로 단일 일정 +n 과다 → 유연 레인 배치 (멀티데이 우선 → 빈 레인에 단일 일정)
+9. 댓글 UI 미구현 → CommentSection 인라인 컴포넌트 구현 (조회/작성/수정/삭제 + 알림 + EventList 뱃지)
 
 ## 알려진 이슈 및 남은 작업
 
 1. 테스트 코드 작성 (유닛/통합 테스트 미구현)
-2. 댓글 UI (백엔드 API 완성, 프론트엔드에 댓글 표시/작성 UI 미구현)
-3. 예외 이벤트에서 "전체 완료" 시 시리즈 미전파 (BUG-003)
-4. DEPT_LEAD 스코프별 일정 조회 실제 테스트 필요
+2. 예외 이벤트에서 "전체 완료" 시 시리즈 미전파 (BUG-003)
+3. DEPT_LEAD 스코프별 일정 조회 실제 테스트 필요

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Clock, CheckCircle, Edit, Trash2, Info, Bell } from 'lucide-react';
+import { X, Clock, CheckCircle, Edit, Trash2, Info, Bell, MessageCircle } from 'lucide-react';
 import { getRelativeTime, NOTIFICATION_TYPES } from '../../utils/mockNotifications';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useActionGuard } from '../../hooks/useActionGuard';
@@ -72,6 +72,7 @@ export default function NotificationModal({ isOpen, onClose }) {
       [NOTIFICATION_TYPES.EVENT_COMPLETED]: { icon: <CheckCircle {...iconProps} />, color: '#10b981', bg: isDarkMode ? '#1c3b2a' : '#d1fae5' },
       [NOTIFICATION_TYPES.EVENT_UPDATED]: { icon: <Edit {...iconProps} />, color: '#f59e0b', bg: isDarkMode ? '#3b2f1a' : '#fef3c7' },
       [NOTIFICATION_TYPES.EVENT_DELETED]: { icon: <Trash2 {...iconProps} />, color: '#ef4444', bg: isDarkMode ? '#3b1a1a' : '#fee2e2' },
+      [NOTIFICATION_TYPES.EVENT_COMMENTED]: { icon: <MessageCircle {...iconProps} />, color: '#3B82F6', bg: isDarkMode ? '#1e3a5f' : '#dbeafe' },
       [NOTIFICATION_TYPES.SYSTEM]: { icon: <Info {...iconProps} />, color: '#8b5cf6', bg: isDarkMode ? '#2d1f5e' : '#ede9fe' },
     };
     return configs[type] || { icon: <Bell {...iconProps} />, color: '#3B82F6', bg: isDarkMode ? '#1e3a5f' : '#dbeafe' };

@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPES = {
   EVENT_COMPLETED: 'EVENT_COMPLETED',
   EVENT_UPDATED: 'EVENT_UPDATED',
   EVENT_DELETED: 'EVENT_DELETED',
+  EVENT_COMMENTED: 'EVENT_COMMENTED',
   SYSTEM: 'SYSTEM'
 };
 
@@ -173,6 +174,8 @@ export const getNotificationIcon = (type) => {
       return 'Edit';
     case NOTIFICATION_TYPES.EVENT_DELETED:
       return 'Trash2';
+    case NOTIFICATION_TYPES.EVENT_COMMENTED:
+      return 'MessageCircle';
     case NOTIFICATION_TYPES.SYSTEM:
       return 'Info';
     default:
