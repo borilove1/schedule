@@ -456,7 +456,8 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
             <button type="submit" disabled={loading || rateLimitCountdown > 0} style={{
               padding: '10px 20px', borderRadius: '8px', border: 'none',
               backgroundColor: (loading || rateLimitCountdown > 0) ? '#1e40af' : '#3B82F6', color: '#fff',
-              cursor: (loading || rateLimitCountdown > 0) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', fontFamily
+              cursor: (loading || rateLimitCountdown > 0) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', fontFamily,
+              opacity: (loading || rateLimitCountdown > 0) ? 0.5 : 1
             }}>{loading ? '생성 중...' : '일정 만들기'}</button>
           </div>
         </form>
