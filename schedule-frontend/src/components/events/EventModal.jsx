@@ -428,13 +428,16 @@ export default function EventModal({ isOpen, onClose, onSuccess, selectedDate, r
 
           {rateLimitCountdown > 0 ? (
             <div style={{
-              padding: '12px 16px', borderRadius: '8px',
-              backgroundColor: '#fef3c7', color: '#92400e', fontSize: '14px',
-              marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '12px', borderRadius: '8px',
+              backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
+              color: isDarkMode ? '#fca5a5' : '#dc2626',
+              fontSize: '14px', marginBottom: '16px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
             }}>
               <span>요청이 너무 많습니다. 잠시 후 다시 시도해주세요.</span>
               <span style={{
-                fontWeight: '700', fontSize: '14px', backgroundColor: '#f59e0b',
+                fontWeight: '700', fontSize: '13px',
+                backgroundColor: isDarkMode ? '#dc2626' : '#ef4444',
                 color: '#fff', borderRadius: '12px', padding: '2px 10px', minWidth: '28px',
                 textAlign: 'center', display: 'inline-block',
               }}>
